@@ -115,7 +115,7 @@ Cuando un cliente liquida su cuenta mensual, dispone de dos opciones en la venta
 Cada vez que se registra un consumo (`Transaccion`), no se altera arbitrariamente el inventario a menos que se desee. En la sección de Inventario, los administradores pueden gestionar el catálogo completo de productos vinculándolos a categorías, actualizar su información y reabastecer el stock físico.
 
 ### 4.6 Seguridad y Mitigación de Vulnerabilidades
-*   **JWT en Cookies HttpOnly:** Aunque el backend admite tokens en cabeceras HTTP mediante Bearer tokens para máxima compatibilidad con APIs, el flujo web principal establece la sesión en una cookie `httponly=True`, `secure=True` y `SameSite=Lax`. Esto mitiga los ataques de robo de sesión a través de Scripts Cross-Site (XSS).
+*   **JWT en Cookies HttpOnly:** El flujo web principal establece la sesión en una cookie `httponly=True`, `secure=True` y `SameSite=Lax`. Se eliminó por completo el uso de `localStorage` para almacenar tokens o preferencias de interfaz, cerrando de raíz vulnerabilidades de inyección de código (XSS).
 *   **Cabeceras HTTP de Seguridad:** Un middleware global en FastAPI inyecta cabeceras de seguridad estrictas en cada respuesta:
     *   `X-Content-Type-Options: nosniff` (previene MIME sniffing).
     *   `X-Frame-Options: DENY` (evita Clickjacking).
@@ -220,6 +220,7 @@ El backend se organiza bajo una estructura modular orientada a servicios:
     *   Establece las relaciones clave y cascading deletes.
 *   **`backend/esquemas.py` (Módulo de Validación Pydantic):**
     *   Define los esquemas de entrada y salida (DTOs) para validar los tipos de datos en cada petición REST.
+    *   Implementa reciclaje de código mediante alias para esquemas idénticos (ej. `CategoriaActualizar = CategoriaCrear`).
     *   Contiene desinfectadores de texto personalizados (`evitar_html_y_scripts`) para prevenir ataques XSS.
 *   **`backend/routers/` (Módulo de Controladores / Endpoints):**
     *   `clientes.py`: Controla la gestión de perfiles de clientes, incluyendo su creación, lectura, actualización y eliminación.
@@ -235,15 +236,18 @@ El frontend está estructurado para maximizar la reutilización de componentes y
 *   **`src/types/index.ts` (Módulo de Tipos):**
     *   Define las interfaces de TypeScript que representan los tipos del negocio (coincidentes con los esquemas Pydantic del backend).
 *   **`src/services/api.ts` (Módulo de Servicios HTTP):**
-    *   Configura la instancia global de Axios.
-    *   Implementa interceptores automáticos de solicitudes que inyectan el token JWT desde el `localStorage` en las cabeceras HTTP de forma transparente.
+    *   Configura la instancia global de Axios con `withCredentials: true`.
+    *   Gestiona automáticamente el envío de la sesión (cookie HttpOnly) al servidor en cada petición sin necesidad de inyectar cabeceras manuales.
+*   **`src/hooks/` (Módulo de Hooks Personalizados - Código Reciclado):**
+    *   `useClickAfuera.ts`: Hook centralizado para cerrar modales/popups al hacer clic fuera del contenedor. Reemplazó la lógica duplicada en los selectores.
+*   **`src/utils/` (Módulo de Utilidades - Código Reciclado):**
+    *   `formato.ts`: Centraliza funciones de formateo recurrentes como `formatoDinero` y `formatearFechaHora`, eliminando su repetición en 5 componentes distintos.
 *   **`src/components/` (Módulo de Componentes Reutilizables):**
-    *   Contiene los componentes de interfaz que no manejan hojas de estilos locales CSS, optimizados de forma limpia y directa:
+    *   Contiene los componentes de interfaz modulares que consumen los hooks compartidos:
         *   `MenuDesplegable.tsx`: Desplegable elegante con soporte de iconos Lucide y colores.
         *   `ResumenPestanas.tsx`: Panel que calcula subtotales, descuentos y totales dinámicamente con guardado asíncrono debounced.
         *   `SelectorMes.tsx`: Selector interactivo de mes y año con grilla desplegable.
         *   `SelectorPremium.tsx`: Botón selector multi-opción de estilo premium.
-        *   `TarjetaProducto.tsx`: Tarjetas individuales para la presentación del catálogo de productos.
 *   **`src/pages/` (Módulo de Vistas / Páginas Principales):**
     *   `InicioSesion/InicioSesion.tsx`: Pantalla de login segura con animación y carga del logo dinámico del establecimiento.
     *   `PanelAtencion/PanelAtencion.tsx`: Panel principal de operaciones donde se busca, registra y edita a los clientes, se cargan sus consumos y se gestionan sus estados.
