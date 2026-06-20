@@ -1,120 +1,84 @@
-# ☕ Sistema de Gestión de Cuentas y Fiados - Cafetería
+<div align="center">
+  <img src="frontend/public/favicon.svg" alt="Logo Cafetería" width="120" />
+  <h1>Sistema Premium de Gestión de Cuentas y Fiados</h1>
+  <p><em>Automatización elegante, arquitectura robusta y seguridad empresarial para cafeterías e instituciones.</em></p>
 
-Una aplicación web full-stack diseñada para automatizar, modernizar y asegurar el registro de cuentas y fiados en cafeterías, reemplazando las planillas manuales por un sistema fluido, elegante y escalable.
+  <!-- Badges -->
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+</div>
 
----
+<br />
 
-## 📑 Tabla de Contenidos
-1. [Visión General del Producto](#1-visión-general-del-producto)
-2. [Arquitectura y Stack Tecnológico](#2-arquitectura-y-stack-tecnológico)
-3. [Características y Funcionalidades Principales](#3-características-y-funcionalidades-principales)
-4. [Esquema de Base de Datos y Lógica de Negocio](#4-esquema-de-base-de-datos-y-lógica-de-negocio)
-5. [Decisiones de UI/UX (Frontend)](#5-decisiones-de-uiux-frontend)
-6. [Instalación y Primeros Pasos](#6-instalación-y-primeros-pasos)
-7. [Seguridad](#7-seguridad)
-
----
-
-## 1. Visión General del Producto
-El sistema resuelve la problemática clásica de las cafeterías e instituciones: el manejo de "fiados" (cuentas abiertas a pagar a fin de mes). 
-Permite administrar clientes recurrentes, mantener un catálogo de productos con precios actualizados y registrar cada consumo (transacción) en una cuenta mensual por cliente. Soporta pagos totales, pagos parciales en el mismo mes, y aplicación de porcentajes de descuento sobre el total consumido, todo en tiempo real.
+Una aplicación web *Full-Stack* orientada a resolver una problemática clásica de las instituciones y locales gastronómicos: **el manejo seguro de cuentas abiertas y "fiados" a fin de mes**. Construido con un enfoque obsesivo en el diseño UX/UI (Glassmorphism) y en arquitecturas Backend limpias.
 
 ---
 
-## 2. Arquitectura y Stack Tecnológico
-El proyecto está estrictamente desacoplado en dos repositorios/carpetas, comunicados mediante una API RESTful en formato JSON.
+## 🛠️ Arquitectura Técnica
 
-### Backend (Python)
-*   **Framework:** **FastAPI** (Python 3.10+) - Elegido por su velocidad, validación asíncrona de datos con Pydantic y documentación automática.
-*   **ORM:** **SQLAlchemy** - Abstrae la lógica SQL y mapea las entidades.
-*   **Migraciones:** **Alembic** - Permite evolucionar el esquema de base de datos sin perder datos.
-*   **Base de Datos:** **PostgreSQL** corriendo en un contenedor aislado con Docker.
+El sistema está estrictamente desacoplado, comunicándose a través de una API RESTful completamente documentada.
 
-### Frontend (React)
-*   **Framework:** **React 18** con **TypeScript** para un tipado estático robusto.
-*   **Bundler:** **Vite** para tiempos de compilación instantáneos en desarrollo.
-*   **Librerías clave:** `React Router DOM` para navegación SPA y `Axios` para peticiones HTTP con interceptores JWT.
+### Backend (Python / FastAPI)
+*   **Motor de API Asíncrono:** Desarrollado con FastAPI, aprovechando las capacidades asíncronas de Python (Starlette) para un alto rendimiento en I/O.
+*   **Validación Estricta:** Integración profunda con Pydantic para la serialización y validación estricta de datos de entrada/salida (DTOs), eliminando errores de tipo en tiempo de ejecución.
+*   **Gestión de Base de Datos (ORM):** Uso de SQLAlchemy (v2.0) con sesiones asíncronas para mapeo objeto-relacional. Toda la lógica transaccional compleja ocurre aquí.
+*   **Gestión de Estados e Historial:** Las cuentas no almacenan totales pre-calculados, mitigando inconsistencias de datos. Todo el cálculo de consumos, precios históricos congelados y descuentos se realiza "al vuelo" a nivel de servicio mediante consultas optimizadas.
 
----
-
-## 3. Características y Funcionalidades Principales
-
-- **Gestión de Cuentas Multi-Tabs:** Los clientes no están limitados a una sola cuenta por mes. Si un cliente liquida su deuda a mitad de mes y luego vuelve a consumir, el sistema automáticamente genera una "nueva" cuenta para ese mismo mes, manteniendo el historial del primer pago de forma transparente.
-- **Congelamiento de Precios Históricos:** Al agregar un producto a la cuenta de un cliente, el precio en ese instante se "congela" en la transacción. Si el precio del café sube la semana siguiente, los consumos previos no se ven afectados.
-- **Descuentos Dinámicos:** Permite aplicar un % de descuento global a la cuenta mensual en cualquier momento antes del cierre.
-- **Historial Consolidado:** Los consumos ya pagados en el mismo mes se agrupan y muestran visualmente diferenciados para dar contexto, sumando un indicador de "Ya pagado en el mes".
+### Frontend (React / TypeScript / Vite)
+*   **Arquitectura Modular:** Componentes reutilizables fuertemente tipados. Los hooks personalizados (ej. `useClickAfuera`) centralizan el comportamiento.
+*   **Estado Reactivo:** Uso de React Context API para propagar datos de negocio y validación de sesiones sin _prop-drilling_.
+*   **Interceptor de Peticiones:** Integración de Axios configurado con interceptores globales y `withCredentials: true` para enviar el contexto de sesión de manera silenciosa en cada petición.
 
 ---
 
-## 4. Esquema de Base de Datos y Lógica de Negocio
+## 🔒 Auditoría y Medidas de Seguridad
 
-La base de datos relacional (PostgreSQL) está diseñada para garantizar la integridad financiera:
+El sistema no confía en implementaciones genéricas y ha sido endurecido frente a los vectores de ataque web más comunes:
 
-1. **`usuarios`**: Manejo de roles (`admin`, `staff`) y contraseñas hasheadas (bcrypt).
-2. **`clientes`**: Información de contacto y estado lógico (`activo`/`inactivo`).
-3. **`productos`**: Catálogo centralizado.
-4. **`cuentas_mensuales`**: Agrupa consumos por `cliente_id`, `mes` y `anio`. Guarda el `estado` (`abierta` o `pagada`) y el `porcentaje_descuento`.
-5. **`transacciones`**: Cada ítem individual. Almacena la `cantidad` y el `precio_historico`.
+1. **Defensa contra XSS (Cross-Site Scripting):**
+   * Eliminación absoluta del uso de `localStorage` para almacenamiento de credenciales.
+   * La sesión JWT se almacena y viaja mediante **Cookies HttpOnly**, invisibles para JavaScript, garantizando que un script malicioso no pueda robar la sesión.
+   * Se aplican desinfectadores automáticos en Pydantic (`backend/esquemas.py`) que filtran inyecciones HTML en cualquier _input_ de texto.
 
-### Cálculo en Tiempo Real
-El backend no guarda el `total` final en la base de datos para evitar inconsistencias. FastAPI calcula los totales "al vuelo" cada vez que se pide una cuenta: suma `(cantidad * precio_historico)` de cada transacción, y aplica la matemática del descuento devolviendo totales precisos.
+2. **Cabeceras de Seguridad Inyectadas (Middleware Global):**
+   * `X-Content-Type-Options: nosniff` para evitar ataques de tipo MIME.
+   * `X-Frame-Options: DENY` para protección contra _Clickjacking_.
+   * `Content-Security-Policy (CSP)` estricto para mitigar la ejecución de scripts no autorizados.
 
----
-
-## 5. Decisiones de UI/UX (Frontend)
-
-El frontend ha sido pulido con una atención extrema al detalle visual y de interacción, buscando un aspecto **Premium** y **Moderno**:
-
-- **Estética Glassmorphism:** Uso de `backdrop-filter: blur()`, fondos translúcidos y sombras suaves para dar profundidad a la interfaz.
-- **Modales de Confirmación:** Al intentar eliminar un producto de una lista, la pantalla completa se oscurece y desenfoca, forzando la atención del usuario en el cuadro de diálogo central. Esto evita eliminaciones accidentales.
-- **Inputs Matemáticos Naturales:** El campo de descuento permite la escritura libre (0-100) sin las molestas flechas predeterminadas del navegador (`type="text"` con validación regex en lugar de `type="number"`).
-- **Feedback Visual Inmediato:** 
-  - Los productos ya pagados en el mes actual aparecen en la cuenta en color gris, tachados y con una etiqueta verde de "PAGADO".
-  - Las transacciones muestran sutilmente la fecha y hora de carga (`DD/MM HH:MM`).
+3. **Criptografía de Contraseñas:**
+   * Almacenamiento _zero-knowledge_ utilizando hashing bcrypt iterativo + salting único por usuario. (Librería `passlib`).
 
 ---
 
-## 6. Instalación y Primeros Pasos
+## 🎨 Filosofía de Diseño UI/UX
 
-### 6.1. Requisitos Previos
-*   Docker y Docker Compose instalados.
-*   Python 3.10+ (para desarrollo local sin Docker del backend).
-*   Node.js 18+ y npm (para desarrollo del frontend).
+La aplicación rechaza la idea de que el software interno de gestión deba verse aburrido o anticuado. La interfaz compite estéticamente con aplicaciones _premium_ de consumo masivo:
 
-### 6.2. Configuración de Entorno
-Copia el archivo `.env.example` como `.env` en el directorio raíz:
-```bash
-cp .env.example .env
-```
-
-### 6.3. Levantar la Base de Datos
-Inicia el contenedor de PostgreSQL:
-```bash
-docker compose up -d db
-```
-
-### 6.4. Ejecutar el Backend
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head    # Aplica las migraciones a la BD
-uvicorn main:app --reload
-```
-
-### 6.5. Ejecutar el Frontend
-Abre otra terminal:
-```bash
-cd frontend
-npm install
-npm run dev
-```
+*   **Glassmorphism Engine:** Capas translúcidas con `backdrop-filter: blur()`, sombras CSS avanzadas (Box Shadows multicapa) y un esquema de color oscuro sofisticado (no negro absoluto, sino variables HSL curadas).
+*   **Animaciones y Micro-Interacciones:** Elementos reactivos al _hover_, transiciones suaves en popups y modales modulares que bloquean el enfoque de la pantalla.
+*   **Tipografía Moderna:** Carga nativa de fuentes `Inter`/`Outfit` para legibilidad máxima en pantallas financieras.
 
 ---
 
-## 7. Seguridad
+## ⚡ Implementación Inmediata
 
-*   **Autenticación y Sesión:** JWT (JSON Web Tokens) gestionan la sesión. El frontend intercepta solicitudes 401 para redirigir al login si el token expira.
-*   **Protección de Contraseñas:** Se utiliza `passlib` con `bcrypt` para aplicar "salting" y hashing a las contraseñas, previniendo ataques de Rainbow Tables.
-*   **Inyección de Datos:** El uso del ORM SQLAlchemy y la validación de esquemas Pydantic garantizan que los tipos de datos son estrictos y bloquean ataques clásicos de inyección SQL.
+Atrás quedaron los días de largos tutoriales de despliegue. El proyecto incorpora scripts de instalación automatizados (`.sh` y `.bat`) para preparar entornos virtuales, instalar dependencias de Node.js y Python, y dejar el servidor listo en segundos.
+
+### Entornos Soportados:
+1. Asegúrate de tener **Docker** instalado para levantar la base de datos PostgreSQL:
+   ```bash
+   docker compose up -d db
+   ```
+2. **Si usas Linux/Mac**, simplemente ejecuta:
+   ```bash
+   ./instalar.sh
+   ```
+3. **Si usas Windows 10/11**, haz doble clic en:
+   ```cmd
+   instalar.bat
+   ```
+
+Una vez instaladas las dependencias, podrás iniciar tus servidores locales e ingresar al sistema con el usuario por defecto administrado por el backend de manera segura.
