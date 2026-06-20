@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="frontend/public/favicon.svg" alt="Logo Cafetería" width="120" />
   <h1>Sistema Premium de Gestión de Cuentas y Fiados</h1>
   <p><em>Automatización elegante, arquitectura robusta y seguridad empresarial para cafeterías e instituciones.</em></p>
 
