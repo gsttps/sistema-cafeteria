@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { ChevronDown, Check, LucideIcon } from 'lucide-react';
+import { useClickAfuera } from '../hooks/useClickAfuera';
 
 export interface DropdownOption {
   value: string;
@@ -17,17 +18,7 @@ interface MenuDesplegableProps {
 
 export default function MenuDesplegable({ value, onChange, options, minWidth = '320px' }: MenuDesplegableProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const dropdownRef = useClickAfuera<HTMLDivElement>(useCallback(() => setIsOpen(false), []));
 
   const selectedOption = options.find((o) => o.value === value) || options[0];
   const SelectedIcon = selectedOption?.icon;

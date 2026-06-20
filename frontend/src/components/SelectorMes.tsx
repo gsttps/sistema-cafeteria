@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown, Calendar } from 'lucide-react';
+import { useClickAfuera } from '../hooks/useClickAfuera';
 
 interface SelectorMesProps {
   mes: number; // 1-12
@@ -20,23 +21,12 @@ const NOMBRES_MESES_ABREV = [
 function SelectorMes({ mes, anio, onChange }: SelectorMesProps) {
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [anioTemp, setAnioTemp] = useState(anio);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useClickAfuera<HTMLDivElement>(useCallback(() => setMostrarPopup(false), []));
 
   // Sincronizar el año local cuando cambia la prop de año
   useEffect(() => {
     setAnioTemp(anio);
   }, [anio]);
-
-  // Cerrar popup al hacer clic afuera del componente
-  useEffect(() => {
-    const handleClickAfuera = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setMostrarPopup(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickAfuera);
-    return () => document.removeEventListener('mousedown', handleClickAfuera);
-  }, []);
 
   const seleccionarMes = (mesIdx: number) => {
     onChange(mesIdx + 1, anioTemp);

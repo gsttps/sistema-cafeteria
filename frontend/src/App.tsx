@@ -15,7 +15,6 @@ function App() {
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
-    localStorage.setItem('theme', 'dark');
   }, []);
 
   useEffect(() => {
@@ -50,6 +49,13 @@ function App() {
     return <InicioSesion onLoginExitoso={() => setAutenticado(true)} />;
   }
 
+  const navItems = [
+    { to: '/', label: 'Atención' },
+    { to: '/admin', label: 'Panel Admin' },
+    { to: '/balances', label: 'Balances' },
+    { to: '/inventario', label: 'Inventario' },
+  ];
+
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `px-4 py-2 font-semibold text-sm rounded-xl transition-all duration-300 no-underline block ${
       isActive
@@ -67,18 +73,11 @@ function App() {
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-4">
             <nav className="flex gap-2 bg-slate-900/40 p-1.5 rounded-2xl border border-white/5">
-              <NavLink to="/" className={navLinkClass}>
-                Atención
-              </NavLink>
-              <NavLink to="/admin" className={navLinkClass}>
-                Panel Admin
-              </NavLink>
-              <NavLink to="/balances" className={navLinkClass}>
-                Balances
-              </NavLink>
-              <NavLink to="/inventario" className={navLinkClass}>
-                Inventario
-              </NavLink>
+              {navItems.map(item => (
+                <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                  {item.label}
+                </NavLink>
+              ))}
             </nav>
 
             <button
@@ -102,18 +101,11 @@ function App() {
         {menuAbierto && (
           <div className="md:hidden fixed inset-0 top-[60px] bg-[#0b1120]/95 backdrop-blur-xl z-40 anim-fade-in">
             <nav className="flex flex-col gap-2 p-6">
-              <NavLink to="/" className={navLinkClass} onClick={() => setMenuAbierto(false)}>
-                Atención
-              </NavLink>
-              <NavLink to="/admin" className={navLinkClass} onClick={() => setMenuAbierto(false)}>
-                Panel Admin
-              </NavLink>
-              <NavLink to="/balances" className={navLinkClass} onClick={() => setMenuAbierto(false)}>
-                Balances
-              </NavLink>
-              <NavLink to="/inventario" className={navLinkClass} onClick={() => setMenuAbierto(false)}>
-                Inventario
-              </NavLink>
+              {navItems.map(item => (
+                <NavLink key={item.to} to={item.to} className={navLinkClass} onClick={() => setMenuAbierto(false)}>
+                  {item.label}
+                </NavLink>
+              ))}
 
               <hr className="border-slate-700/50 my-4" />
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import SelectorMes from '../../components/SelectorMes';
 import { servicioBalances } from '../../services/api';
+import { formatoDinero } from '../../utils/formato';
 
 interface ProductoTop {
   nombre: string;
@@ -44,13 +45,7 @@ const Balances = () => {
     fetchBalances();
   }, [mes, anio]);
 
-  const formatoMoneda = (monto: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0
-    }).format(monto);
-  };
+
 
   const totalEsperado = data ? Number(data.total_pagado) + Number(data.total_pendiente) : 0;
 
@@ -93,15 +88,15 @@ const Balances = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div className="bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:bg-slate-800/90">
                 <p className="text-emerald-400/80 text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider">Total Pagado</p>
-                <p className="text-emerald-400 text-2xl sm:text-3xl font-bold">{formatoMoneda(Number(data?.total_pagado || 0))}</p>
+                <p className="text-emerald-400 text-2xl sm:text-3xl font-bold">{formatoDinero(Number(data?.total_pagado || 0))}</p>
               </div>
               <div className="bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:bg-slate-800/90">
                 <p className="text-rose-400/80 text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider">Total Pendiente</p>
-                <p className="text-rose-400 text-2xl sm:text-3xl font-bold">{formatoMoneda(Number(data?.total_pendiente || 0))}</p>
+                <p className="text-rose-400 text-2xl sm:text-3xl font-bold">{formatoDinero(Number(data?.total_pendiente || 0))}</p>
               </div>
               <div className="bg-slate-800/80 backdrop-blur-md border border-blue-500/20 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:bg-slate-800/90">
                 <p className="text-blue-400/80 text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider">Ingreso Proyectado</p>
-                <p className="text-blue-400 text-2xl sm:text-3xl font-bold">{formatoMoneda(totalEsperado)}</p>
+                <p className="text-blue-400 text-2xl sm:text-3xl font-bold">{formatoDinero(totalEsperado)}</p>
               </div>
             </div>
 
@@ -152,7 +147,7 @@ const Balances = () => {
                       </div>
                       <span className="text-slate-200 font-medium">{cliente.nombre}</span>
                     </div>
-                    <span className="text-emerald-400 font-semibold">{formatoMoneda(Number(cliente.total_gastado))}</span>
+                    <span className="text-emerald-400 font-semibold">{formatoDinero(Number(cliente.total_gastado))}</span>
                   </div>
                 ))
               ) : (

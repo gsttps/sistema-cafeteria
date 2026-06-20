@@ -6,6 +6,7 @@ import SelectorMes from '../../components/SelectorMes';
 import { Plus, Phone, ArrowLeft, Trash2, ArrowDownAZ, Coins, AlertCircle, Edit } from 'lucide-react';
 import MenuDesplegable from '../../components/MenuDesplegable';
 import SelectorPremium from '../../components/SelectorPremium';
+import { formatoDinero, formatearFechaHora } from '../../utils/formato';
 
 function PanelAtencion() {
   // Navigation State
@@ -169,19 +170,7 @@ function PanelAtencion() {
     }
   };
 
-  // --- LOGICA DE MODAL CLIENTE ---
-  const formatearFechaHora = (str: string) => {
-    try {
-      const d = new Date(str);
-      const dia = String(d.getDate()).padStart(2, '0');
-      const mes = String(d.getMonth() + 1).padStart(2, '0');
-      const horas = String(d.getHours()).padStart(2, '0');
-      const mins = String(d.getMinutes()).padStart(2, '0');
-      return `${dia}/${mes} ${horas}:${mins}`;
-    } catch {
-      return '';
-    }
-  };
+
 
   // Crear cliente rápido
   const guardarNuevoCliente = async (e: React.FormEvent) => {
@@ -248,9 +237,7 @@ function PanelAtencion() {
     }
   };
 
-  const formatoDinero = (val: number) => {
-    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
-  };
+
 
   return (
     <div className="max-w-6xl mx-auto h-full flex flex-col">

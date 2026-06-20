@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CuentaMensual } from '../types';
 import { servicioCuenta } from '../services/api';
 import ModalPagoParcial from '../pages/PanelAtencion/ModalPagoParcial';
+import { formatoDinero } from '../utils/formato';
 
 interface ResumenPestanasProps {
   cuentaSeleccionada: CuentaMensual | null;
@@ -67,10 +68,7 @@ function ResumenPestanas({ cuentaSeleccionada, onCuentaCambiada, clienteEstado }
     }
   };
 
-  const formatoDinero = (val?: number) => {
-    if (val === undefined) return '$0';
-    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
-  };
+
 
   // Cálculos dinámicos al instante en el frontend
   const subtotal = Number(cuentaSeleccionada.total_original || 0);

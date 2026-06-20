@@ -69,13 +69,8 @@ class CategoriaCrear(BaseModel):
     def validar_nombre_categoria(cls, v: Optional[str]) -> Optional[str]:
         return evitar_html_y_scripts(v)
 
-class CategoriaActualizar(BaseModel):
-    nombre: str = Field(..., min_length=1, max_length=100)
-
-    @field_validator('nombre')
-    @classmethod
-    def validar_nombre_categoria(cls, v: Optional[str]) -> Optional[str]:
-        return evitar_html_y_scripts(v)
+# Reutilizar: CategoriaActualizar tiene los mismos campos que CategoriaCrear
+CategoriaActualizar = CategoriaCrear
 
 class CategoriaRespuesta(BaseModel):
     id: UUID

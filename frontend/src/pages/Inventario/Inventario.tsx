@@ -5,6 +5,7 @@ import { Producto, Categoria } from '../../types';
 import { servicioProducto, servicioCategoria } from '../../services/api';
 import ModalCategorias from './ModalCategorias';
 import ModalProducto from './ModalProducto';
+import { formatoDinero } from '../../utils/formato';
 
 const Inventario = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -94,9 +95,7 @@ const Inventario = () => {
     return filtrados;
   }, [productos, busqueda, categoriaFiltro, ordenConfig]);
 
-  const formatoMoneda = (monto: number) => {
-    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(monto);
-  };
+
 
   return (
     <div className="anim-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -200,7 +199,7 @@ const Inventario = () => {
                         <span className="text-slate-500 text-xs italic">Sin categoría</span>
                       )}
                     </td>
-                    <td className="p-4 text-slate-300">{formatoMoneda(prod.precio_actual)}</td>
+                    <td className="p-4 text-slate-300">{formatoDinero(prod.precio_actual)}</td>
                     <td className="p-4">
                       <span className={`font-semibold ${prod.stock_actual <= 5 ? 'text-red-400' : 'text-emerald-400'}`}>
                         {prod.stock_actual}

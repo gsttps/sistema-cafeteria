@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useClickAfuera } from '../hooks/useClickAfuera';
 
 interface Opcion {
   value: string;
@@ -16,23 +17,7 @@ interface SelectorPremiumProps {
 
 function SelectorPremium({ value, opciones, onChange, className = '', anchoPopup = 'w-[200px]' }: SelectorPremiumProps) {
   const [mostrarPopup, setMostrarPopup] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Cerrar popup al hacer clic afuera
-  useEffect(() => {
-    const handleClickAfuera = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setMostrarPopup(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickAfuera);
-    return () => document.removeEventListener('mousedown', handleClickAfuera);
-  }, []);
-
-  const seleccionarOpcion = (val: string) => {
-    onChange(val);
-    setMostrarPopup(false);
-  };
+  const containerRef = useClickAfuera<HTMLDivElement>(useCallback(() => setMostrarPopup(false), []));
 
   const opcionSeleccionada = opciones.find(opt => opt.value === value) || opciones[0];
 
@@ -55,7 +40,7 @@ function SelectorPremium({ value, opciones, onChange, className = '', anchoPopup
               <button
                 key={opcion.value}
                 type="button"
-                onClick={() => seleccionarOpcion(opcion.value)}
+                onClick={() => { onChange(opcion.value); setMostrarPopup(false); }}
                 className={`py-2 px-4 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer border text-left ${
                   esSeleccionado 
                     ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-[1.02] ml-2 mr-2' 
