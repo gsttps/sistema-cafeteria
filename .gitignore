@@ -1,0 +1,60 @@
+# =========================
+# IGNORAR PARA BACKEND (PYTHON/FASTAPI)
+# =========================
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+env/
+
+# Variables de entorno y secretos
+.env
+.env.local
+.env.*
+
+# Logs y bases de datos locales (SQLite, etc)
+*.log
+*.sqlite3
+
+# Caché de herramientas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+
+# =========================
+# IGNORAR PARA FRONTEND (REACT/NODE)
+# =========================
+
+# Dependencias de Node
+node_modules/
+
+# Archivos de empaquetado (Builds)
+dist/
+build/
+
+# Caché de herramientas
+.eslintcache
+
+
+# =========================
+# IGNORAR PARA EL SISTEMA OPERATIVO / IDE
+# =========================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Configuración de Editores (VSCode, Cursor, etc)
+.vscode/
+.idea/
+*.swp
+*.swo
