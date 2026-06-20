@@ -8,7 +8,9 @@ from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
-
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from backend.core.configuracion import configuracion, obtener_hash_contrasena, verificar_contrasena, crear_token_acceso
 from backend.base_datos import obtener_db, obtener_usuario_actual, SesionLocal, _extraer_token
 from backend.modelos import Usuario
@@ -18,6 +20,8 @@ from backend.routers import clientes, productos, cuentas, balances, categorias
 # Directorio para almacenar el logo personalizado
 LOGO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
+# Configuración del limitador de peticiones (Rate Limiting)
+limiter = Limiter(key_func=get_remote_address)
 
 # --- EVENTO DE INICIO: crear usuario por defecto cafe/cafe ---
 @asynccontextmanager
@@ -46,6 +50,10 @@ app = FastAPI(
     openapi_url=f"{configuracion.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+# Añadir manejador de errores de Rate Limiting al servidor
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configuración oficial y segura de CORS
 origenes_permitidos = [
@@ -101,7 +109,9 @@ def _establecer_cookie_sesion(response: Response, username: str, rol: str):
 
 
 @auth_router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 def login(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(obtener_db)
