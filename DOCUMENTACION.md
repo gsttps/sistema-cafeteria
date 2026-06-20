@@ -122,6 +122,7 @@ Cada vez que se registra un consumo (`Transaccion`), no se altera arbitrariament
     *   `X-XSS-Protection: 1; mode=block` (filtro XSS activo).
     *   `Content-Security-Policy` (CSP restringido que limita la carga de scripts, fuentes e imágenes a orígenes de confianza y bloquea conexiones externas no deseadas).
 *   **Desinfección de Inputs contra Inyecciones:** Los esquemas de entrada de Pydantic utilizan el validador `evitar_html_y_scripts` para examinar campos de texto críticos (`nombre`, `username`, etc.), bloqueando caracteres como `<` y `>` y palabras clave como `javascript:`, `onerror` y `onload`.
+*   **Mitigación de Ataques de Fuerza Bruta:** Implementación de *Rate Limiting* en rutas sensibles (como `/api/v1/auth/login`) a través de la librería `slowapi`. Limita proactivamente la cantidad de peticiones permitidas por minuto desde una misma dirección IP, previniendo eficazmente ataques de diccionario.
 
 ---
 

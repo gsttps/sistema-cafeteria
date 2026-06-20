@@ -50,6 +50,10 @@ El sistema no confía en implementaciones genéricas y ha sido endurecido frente
 3. **Criptografía de Contraseñas:**
    * Almacenamiento _zero-knowledge_ utilizando hashing bcrypt iterativo + salting único por usuario. (Librería `passlib`).
 
+4. **Protección contra Fuerza Bruta (Rate Limiting):**
+   * El endpoint de autenticación está protegido a nivel de aplicación con `slowapi`.
+   * Límite estricto de intentos de inicio de sesión por IP para neutralizar instantáneamente ataques de diccionario o fuerza bruta.
+
 ---
 
 ## 🎨 Filosofía de Diseño UI/UX
