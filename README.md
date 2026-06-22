@@ -1,6 +1,5 @@
 <div align="center">
-  <h1>Sistema Premium de Gestión de Cuentas y Fiados</h1>
-  <p><em>Automatización elegante, arquitectura robusta y seguridad empresarial para cafeterías e instituciones.</em></p>
+  <h1>Sistema de Gestión de Cuentas e inventario</h1>
 
   <!-- Badges -->
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
@@ -12,7 +11,7 @@
 
 <br />
 
-Una aplicación web *Full-Stack* orientada a resolver una problemática clásica de las instituciones y locales gastronómicos: **el manejo seguro de cuentas abiertas y "fiados" a fin de mes**. Construido con un enfoque obsesivo en el diseño UX/UI (Glassmorphism) y en arquitecturas Backend limpias.
+Una aplicación web *Full-Stack* orientada a resolver una problemática clásica de las instituciones y locales gastronómicos: **el manejo seguro de cuentas abiertas a fin de mes**. Construido con un enfoque obsesivo en el diseño UX/UI (Glassmorphism) y en arquitecturas Backend limpias.
 
 ---
 
