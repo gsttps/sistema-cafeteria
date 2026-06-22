@@ -64,23 +64,3 @@ La aplicación rechaza la idea de que el software interno de gestión deba verse
 *   **Tipografía Moderna:** Carga nativa de fuentes `Inter`/`Outfit` para legibilidad máxima en pantallas financieras.
 
 ---
-
-## ⚡ Implementación Inmediata
-
-Atrás quedaron los días de largos tutoriales de despliegue. El proyecto incorpora scripts de instalación automatizados (`.sh` y `.bat`) para preparar entornos virtuales, instalar dependencias de Node.js y Python, y dejar el servidor listo en segundos.
-
-### Entornos Soportados:
-1. Asegúrate de tener **Docker** instalado para levantar la base de datos PostgreSQL:
-   ```bash
-   docker compose up -d db
-   ```
-2. **Si usas Linux/Mac**, simplemente ejecuta:
-   ```bash
-   ./instalar.sh
-   ```
-3. **Si usas Windows 10/11**, haz doble clic en:
-   ```cmd
-   instalar.bat
-   ```
-
-Una vez instaladas las dependencias, podrás iniciar tus servidores locales e ingresar al sistema con el usuario por defecto administrado por el backend de manera segura.
