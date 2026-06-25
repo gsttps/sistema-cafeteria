@@ -32,7 +32,7 @@ El sistema está estrictamente desacoplado, comunicándose a través de una API 
 
 ---
 
-## 🔒 Auditoría y Medidas de Seguridad
+## Auditoría y Medidas de Seguridad
 
 El sistema no confía en implementaciones genéricas y ha sido endurecido frente a los vectores de ataque web más comunes:
 
@@ -55,7 +55,7 @@ El sistema no confía en implementaciones genéricas y ha sido endurecido frente
 
 ---
 
-## 🎨 Filosofía de Diseño UI/UX
+## Filosofía de Diseño UI/UX
 
 La aplicación rechaza la idea de que el software interno de gestión deba verse aburrido o anticuado. La interfaz compite estéticamente con aplicaciones _premium_ de consumo masivo:
 
