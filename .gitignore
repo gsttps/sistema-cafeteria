@@ -65,3 +65,7 @@ Thumbs.db
 contenedor.txt
 instalar.sh
 instalar.bat
+
+# Contexto de IA ignorado
+GEMINI.md
+CLAUDE.md
