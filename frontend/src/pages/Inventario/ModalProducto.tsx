@@ -3,6 +3,7 @@ import { X, Save, AlertCircle } from 'lucide-react';
 import { Producto, Categoria } from '../../types';
 import { servicioProducto, servicioCategoria } from '../../services/api';
 import SelectorPremium from '../../components/SelectorPremium';
+import { useTeclaEscape } from '../../hooks/useTeclaEscape';
 
 interface ModalProductoProps {
   isOpen: boolean;
@@ -79,22 +80,25 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
     }
   };
 
+  useTeclaEscape(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={productoEditar ? 'Editar producto' : 'Nuevo producto'}>
+      <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
-      
+
       <div className="bg-[#0b1120] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative z-10 anim-slide-in">
         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
           <h2 className="text-xl font-bold text-slate-100">
             {productoEditar ? 'Editar Producto' : 'Nuevo Producto'}
           </h2>
-          <button 
+          <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
           >
             <X size={20} />

@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import SelectorMes from '../../components/SelectorMes';
 import { servicioBalances } from '../../services/api';
 import { formatoDinero } from '../../utils/formato';
+
+const NOMBRES_MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
 
 interface ProductoTop {
   nombre: string;
@@ -49,6 +56,42 @@ const Balances = () => {
 
   const totalEsperado = data ? Number(data.total_pagado) + Number(data.total_pendiente) : 0;
 
+  const descargarReporte = () => {
+    if (!data) return;
+    // Construye un CSV con resumen, productos top y clientes top.
+    // Se usa ';' como separador (Excel en es-CL lo interpreta por columnas).
+    const escapar = (valor: string | number) => {
+      const texto = String(valor);
+      return /[";\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+    };
+    const filas: (string | number)[][] = [
+      ['Reporte de Balances', `${NOMBRES_MESES[mes - 1]} ${anio}`],
+      [],
+      ['Resumen'],
+      ['Total Pagado', Number(data.total_pagado)],
+      ['Total Pendiente', Number(data.total_pendiente)],
+      ['Ingreso Proyectado', totalEsperado],
+      [],
+      ['Productos Más Vendidos'],
+      ['Producto', 'Cantidad Vendida'],
+      ...data.productos_top.map((p) => [p.nombre, p.cantidad_vendida]),
+      [],
+      ['Mejores Clientes'],
+      ['Cliente', 'Total Gastado'],
+      ...data.clientes_top.map((c) => [c.nombre, Number(c.total_gastado)]),
+    ];
+    const csv = filas.map((fila) => fila.map(escapar).join(';')).join('\n');
+    // BOM para que Excel reconozca UTF-8 (acentos)
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = `balances_${anio}_${String(mes).padStart(2, '0')}.csv`;
+    enlace.click();
+    URL.revokeObjectURL(url);
+    toast.success('Reporte descargado.');
+  };
+
   return (
     <div className="anim-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -62,7 +105,7 @@ const Balances = () => {
         </div>
         
         {/* Selector de Mes reutilizado del Panel de Atención */}
-        <div className="relative z-50 w-full sm:w-[300px]">
+        <div className="relative z-dropdown w-full sm:w-[300px]">
           <SelectorMes 
             mes={mes} 
             anio={anio} 
@@ -157,7 +200,12 @@ const Balances = () => {
               )}
             </div>
 
-            <button className="mt-6 w-full py-3 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 font-semibold rounded-xl border border-blue-500/30 transition-colors duration-200">
+            <button
+              onClick={descargarReporte}
+              disabled={!data}
+              className="mt-6 w-full py-3 bg-blue-600/20 hover:bg-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed text-blue-400 font-semibold rounded-xl border border-blue-500/30 transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              <Download size={18} />
               Descargar Reporte Detallado
             </button>
           </div>

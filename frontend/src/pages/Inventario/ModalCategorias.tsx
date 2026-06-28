@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Edit2, Check, AlertCircle } from 'lucide-react';
+import ModalConfirmacion from '../../components/ModalConfirmacion';
 import { Categoria } from '../../types';
 import { servicioCategoria } from '../../services/api';
+import { useTeclaEscape } from '../../hooks/useTeclaEscape';
 
 interface ModalCategoriasProps {
   isOpen: boolean;
@@ -16,6 +18,7 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
   const [nuevaCategoria, setNuevaCategoria] = useState('');
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editandoNombre, setEditandoNombre] = useState('');
+  const [pendienteEliminarId, setPendienteEliminarId] = useState<string | null>(null);
 
   const cargarCategorias = async () => {
     setCargando(true);
@@ -62,31 +65,48 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
     }
   };
 
-  const handleEliminar = async (id: string) => {
-    if (!window.confirm('¿Seguro que deseas eliminar esta categoría?')) return;
+  const confirmarEliminar = async () => {
+    if (!pendienteEliminarId) return;
     try {
       setError(null);
-      await servicioCategoria.eliminar(id);
+      await servicioCategoria.eliminar(pendienteEliminarId);
       cargarCategorias();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al eliminar. Asegúrate que no haya productos usándola.');
+    } finally {
+      setPendienteEliminarId(null);
     }
   };
+
+  // Escape cierra el modal, salvo que haya una confirmación anidada abierta
+  // (en ese caso Escape lo maneja la propia ModalConfirmacion).
+  useTeclaEscape(isOpen && !pendienteEliminarId, onClose);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
+    <>
+    <ModalConfirmacion
+      isOpen={!!pendienteEliminarId}
+      titulo="Eliminar categoría"
+      mensaje="¿Seguro que deseas eliminar esta categoría? Los productos asociados quedarán sin categoría."
+      textoConfirmar="Eliminar"
+      peligroso
+      onConfirmar={confirmarEliminar}
+      onCancelar={() => setPendienteEliminarId(null)}
+    />
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Gestionar categorías">
+      <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
-      
+
       <div className="bg-[#0b1120] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative z-10 anim-slide-in">
         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
           <h2 className="text-xl font-bold text-slate-100">Gestionar Categorías</h2>
-          <button 
+          <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
           >
             <X size={20} />
@@ -138,10 +158,10 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
                         autoFocus
                         onKeyDown={(e) => e.key === 'Enter' && handleActualizar(cat.id)}
                       />
-                      <button onClick={() => handleActualizar(cat.id)} className="text-emerald-400 hover:text-emerald-300 p-1">
+                      <button onClick={() => handleActualizar(cat.id)} aria-label="Guardar cambios" className="text-emerald-400 hover:text-emerald-300 p-1">
                         <Check size={18} />
                       </button>
-                      <button onClick={() => setEditandoId(null)} className="text-slate-400 hover:text-slate-300 p-1">
+                      <button onClick={() => setEditandoId(null)} aria-label="Cancelar edición" className="text-slate-400 hover:text-slate-300 p-1">
                         <X size={18} />
                       </button>
                     </div>
@@ -149,14 +169,16 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
                     <>
                       <span className="text-slate-200 font-medium">{cat.nombre}</span>
                       <div className="flex gap-1">
-                        <button 
+                        <button
                           onClick={() => { setEditandoId(cat.id); setEditandoNombre(cat.nombre); }}
+                          aria-label={`Editar ${cat.nombre}`}
                           className="text-blue-400 hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-400/10 transition-colors"
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button 
-                          onClick={() => handleEliminar(cat.id)}
+                        <button
+                          onClick={() => setPendienteEliminarId(cat.id)}
+                          aria-label={`Eliminar ${cat.nombre}`}
                           className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-400/10 transition-colors"
                         >
                           <Trash2 size={16} />
@@ -171,6 +193,7 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

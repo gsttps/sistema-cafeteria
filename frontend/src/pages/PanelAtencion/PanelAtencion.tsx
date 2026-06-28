@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Cliente, CuentaMensual, Producto } from '../../types';
 import { servicioCliente, servicioProducto, servicioCuenta } from '../../services/api';
+import { useDebounce } from '../../hooks/useDebounce';
 import ResumenPestanas from '../../components/ResumenPestanas';
 import SelectorMes from '../../components/SelectorMes';
 import { Plus, Phone, ArrowLeft, Trash2, ArrowDownAZ, Coins, AlertCircle, Edit, UtensilsCrossed } from 'lucide-react';
@@ -40,6 +42,8 @@ function PanelAtencion() {
     }
     return a.nombre.localeCompare(b.nombre, 'es');
   });
+
+  const busquedaClienteDebounced = useDebounce(busquedaCliente, 350);
 
   // View 2 (Customer selected) States
   const [cuentaSeleccionada, setCuentaSeleccionada] = useState<CuentaMensual | null>(null);
@@ -85,10 +89,12 @@ function PanelAtencion() {
     }
   };
 
+  const busquedaProductoDebounced = useDebounce(busquedaProducto, 350);
+
   // Cargar lista de productos
   const cargarProductos = async () => {
     try {
-      const resp = await servicioProducto.obtenerTodos(busquedaProducto || undefined);
+      const resp = await servicioProducto.obtenerTodos(busquedaProductoDebounced || undefined);
       setProductos(resp.data);
     } catch (err) {
       console.error('Error al cargar productos:', err);
@@ -100,14 +106,14 @@ function PanelAtencion() {
       cargarClientes();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busquedaCliente, clienteSeleccionado]);
+  }, [busquedaClienteDebounced, clienteSeleccionado]);
 
   useEffect(() => {
     if (clienteSeleccionado) {
       cargarProductos();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busquedaProducto, clienteSeleccionado]);
+  }, [busquedaProductoDebounced, clienteSeleccionado]);
 
   // Al seleccionar un cliente, cargar su cuenta actual
   const seleccionarCliente = async (cliente: Cliente) => {
@@ -142,7 +148,7 @@ function PanelAtencion() {
   const agregarConsumo = async (productoId: string) => {
     if (!clienteSeleccionado || !cuentaSeleccionada) return;
     if (cuentaSeleccionada.estado === 'pagada') {
-      alert('No se pueden agregar productos a una cuenta ya pagada.');
+      toast.error('No se pueden agregar productos a una cuenta ya pagada.');
       return;
     }
 
@@ -154,7 +160,7 @@ function PanelAtencion() {
       await refrescarDatosCuenta();
     } catch (err) {
       console.error('Error al registrar consumo:', err);
-      alert('Error al agregar el producto.');
+      toast.error('Error al agregar el producto.');
     }
   };
 
@@ -173,7 +179,7 @@ function PanelAtencion() {
       await refrescarDatosCuenta();
     } catch (err) {
       console.error('Error al eliminar consumo:', err);
-      alert('No se pudo eliminar el producto.');
+      toast.error('No se pudo eliminar el producto.');
     }
   };
 
@@ -184,7 +190,7 @@ function PanelAtencion() {
     e.preventDefault();
     if (!clienteSeleccionado || !cuentaSeleccionada) return;
     if (cuentaSeleccionada.estado === 'pagada') {
-      alert('No se pueden agregar pedidos a una cuenta ya pagada.');
+      toast.error('No se pueden agregar pedidos a una cuenta ya pagada.');
       return;
     }
     const precio = parseFloat(precioPedido);
@@ -204,7 +210,7 @@ function PanelAtencion() {
       await refrescarDatosCuenta();
     } catch (err) {
       console.error('Error al enviar pedido personalizado:', err);
-      alert('No se pudo registrar el pedido personalizado.');
+      toast.error('No se pudo registrar el pedido personalizado.');
     } finally {
       setEnviandoPedido(false);
     }
@@ -227,7 +233,7 @@ function PanelAtencion() {
       seleccionarCliente(resp.data);
     } catch (err) {
       console.error('Error al crear cliente:', err);
-      alert('No se pudo crear el cliente.');
+      toast.error('No se pudo crear el cliente.');
     }
   };
 
@@ -258,7 +264,7 @@ function PanelAtencion() {
       setMostrarModalEditCliente(false);
     } catch (err) {
       console.error('Error al actualizar cliente:', err);
-      alert('Error al guardar los cambios del cliente.');
+      toast.error('Error al guardar los cambios del cliente.');
     }
   };
 
@@ -271,7 +277,7 @@ function PanelAtencion() {
       setClienteSeleccionado(null);
     } catch (err) {
       console.error('Error al eliminar cliente:', err);
-      alert('No se pudo eliminar el cliente.');
+      toast.error('No se pudo eliminar el cliente.');
     }
   };
 
@@ -282,7 +288,7 @@ function PanelAtencion() {
       
       {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE PRODUCTO (MESSAGE BOX) */}
       {transaccionAEliminar && (
-        <div className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-[9999] backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-modal backdrop-blur-sm">
           <div className="bg-slate-800 p-6 sm:p-10 rounded-2xl w-11/12 max-w-md shadow-2xl border border-slate-700 text-center anim-slide-in">
             <h3 className="mt-0 mb-4 text-slate-100 text-xl sm:text-2xl font-bold tracking-tight">
               Confirmar Quitar Producto
@@ -623,7 +629,7 @@ function PanelAtencion() {
                 type="button"
                 onClick={() => {
                   if (cuentaSeleccionada?.estado === 'pagada') {
-                    alert('No se pueden agregar pedidos a una cuenta ya pagada.');
+                    toast.error('No se pueden agregar pedidos a una cuenta ya pagada.');
                     return;
                   }
                   setMostrarModalPedido(true);
@@ -689,7 +695,7 @@ function PanelAtencion() {
 
       {/* MODAL CREAR CLIENTE RÁPIDO */}
       {mostrarModalCliente && (
-        <div className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-50 backdrop-blur-sm anim-fade-in">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-modal backdrop-blur-sm anim-fade-in">
           <div className="bg-slate-800 p-8 rounded-2xl w-11/12 max-w-md shadow-2xl border border-slate-700">
             <h3 className="mt-0 mb-6 text-slate-100 text-xl font-bold">Registrar Nuevo Cliente</h3>
             <form onSubmit={guardarNuevoCliente} className="space-y-4">
@@ -735,7 +741,7 @@ function PanelAtencion() {
       )}
       {/* MODAL MODIFICAR CLIENTE */}
       {mostrarModalEditCliente && (
-        <div className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-50 backdrop-blur-sm anim-fade-in">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-modal backdrop-blur-sm anim-fade-in">
           <div className="bg-slate-800 p-8 rounded-2xl w-11/12 max-w-md shadow-2xl border border-slate-700">
             <h3 className="mt-0 mb-6 text-slate-100 text-xl font-bold">Modificar Cliente</h3>
             <form onSubmit={guardarCambiosCliente} className="space-y-4">
@@ -804,7 +810,7 @@ function PanelAtencion() {
 
       {/* CONFIRMAR ELIMINAR CLIENTE */}
       {mostrarConfirmarEliminarCliente && (
-        <div className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-[9999] backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-modal backdrop-blur-sm">
           <div className="bg-slate-800 p-10 rounded-2xl w-11/12 max-w-md shadow-2xl border border-slate-700 text-center anim-slide-in">
             <h3 className="mt-0 mb-4 text-slate-100 text-2xl font-bold tracking-tight">
               Confirmar Eliminar Cliente
@@ -835,7 +841,7 @@ function PanelAtencion() {
 
       {/* MODAL PEDIDO PERSONALIZADO */}
       {mostrarModalPedido && (
-        <div className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-50 backdrop-blur-sm anim-fade-in">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-modal backdrop-blur-sm anim-fade-in">
           <div className="bg-slate-800 p-8 rounded-2xl w-11/12 max-w-md shadow-2xl border border-amber-500/20">
             <div className="flex items-center gap-3 mb-6">
               <UtensilsCrossed size={28} className="text-amber-400" />

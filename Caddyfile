@@ -1,0 +1,6 @@
+# Reemplaza "tu-dominio.com" con tu dominio real antes de desplegar.
+# Caddy obtiene y renueva el certificado TLS automáticamente via Let's Encrypt.
+
+tu-dominio.com {
+    reverse_proxy frontend:80
+}

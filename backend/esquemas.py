@@ -184,7 +184,7 @@ class CuentaMensualCrear(BaseModel):
     anio: int
 
 class PagoCuentaRequest(BaseModel):
-    monto_pagado: Optional[float] = Field(None, description="Monto que el cliente está pagando. Si es nulo, se paga el total.")
+    monto_pagado: Optional[Decimal] = Field(None, gt=0, description="Monto que el cliente está pagando. Si es nulo, se paga el total.")
 
 class CuentaMensualRespuesta(BaseModel):
     id: UUID

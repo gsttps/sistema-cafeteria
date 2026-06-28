@@ -1,4 +1,6 @@
+import logging
 import os
+import secrets
 import shutil
 from contextlib import asynccontextmanager
 
@@ -6,6 +8,7 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, Respons
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -17,29 +20,34 @@ from backend.modelos import Usuario
 from backend.esquemas import UsuarioCrear, UsuarioRespuesta, Token, CambiarUsername, CambiarPassword
 from backend.routers import clientes, productos, cuentas, balances, categorias
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
+logger = logging.getLogger(__name__)
+
 # Directorio para almacenar el logo personalizado
 LOGO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 # Configuración del limitador de peticiones (Rate Limiting)
 limiter = Limiter(key_func=get_remote_address)
 
-# --- EVENTO DE INICIO: crear usuario por defecto cafe/cafe ---
+# --- EVENTO DE INICIO: crear usuario admin inicial si no existe ningún usuario ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SesionLocal()
     try:
-        usuario_defecto = db.query(Usuario).filter(Usuario.username == "cafe").first()
-        if not usuario_defecto:
-            usuario_defecto = Usuario(
-                username="cafe",
-                password_hash=obtener_hash_contrasena("cafe"),
+        if db.query(Usuario).count() == 0:
+            password_inicial = configuracion.ADMIN_INITIAL_PASSWORD or secrets.token_urlsafe(16)
+            usuario_admin = Usuario(
+                username="admin",
+                password_hash=obtener_hash_contrasena(password_inicial),
                 rol="admin"
             )
-            db.add(usuario_defecto)
+            db.add(usuario_admin)
             db.commit()
-            print("✅ Usuario por defecto creado: cafe / cafe (rol: admin)")
-        else:
-            print("✅ Usuario por defecto 'cafe' ya existe.")
+            if configuracion.ADMIN_INITIAL_PASSWORD:
+                logger.info("Usuario admin inicial creado con la contraseña configurada en ADMIN_INITIAL_PASSWORD.")
+            else:
+                logger.warning("ADMIN_INITIAL_PASSWORD no definida. Contraseña generada automáticamente: %s", password_inicial)
+                logger.warning("Cambia esta contraseña desde el Panel Admin antes de usar el sistema en producción.")
     finally:
         db.close()
     yield
@@ -55,20 +63,30 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Configuración oficial y segura de CORS
-origenes_permitidos = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://192.168.100.12:5173", # IP local de desarrollo, ajustar para producción
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origenes_permitidos,
+    allow_origins=configuracion.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
+
+
+def _construir_csp() -> str:
+    """Construye el header CSP usando BACKEND_PUBLIC_URL desde la configuración."""
+    backend_url = configuracion.BACKEND_PUBLIC_URL.rstrip("/")
+    ws_url = backend_url.replace("https://", "wss://").replace("http://", "ws://")
+    connect_src = f"'self' {backend_url} {ws_url}"
+    return (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "img-src 'self' data: blob: /api/v1/auth/logo; "
+        f"connect-src {connect_src};"
+    )
+
+_CSP_HEADER = _construir_csp()
 
 # Middleware para añadir Cabeceras de Seguridad (Mitigación XSS, Clickjacking, MIME-sniffing)
 @app.middleware("http")
@@ -78,14 +96,7 @@ async def agregar_cabeceras_seguridad(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src 'self' data: data: https://fonts.gstatic.com; "
-        "img-src 'self' data: blob: /api/v1/auth/logo; "
-        "connect-src 'self' http://localhost:8000 ws://localhost:8000 http://127.0.0.1:8000 ws://127.0.0.1:8000 http://192.168.100.12:8000 ws://192.168.100.12:8000;"
-    )
+    response.headers["Content-Security-Policy"] = _CSP_HEADER
     return response
 
 
@@ -310,3 +321,17 @@ app.include_router(categorias.router, dependencies=[Depends(obtener_usuario_actu
 @app.get("/")
 def raiz():
     return {"mensaje": "La API de Gestión de Cafetería está ejecutándose"}
+
+
+@app.get(f"{configuracion.API_V1_STR}/health", tags=["Monitoreo"])
+def health_check(db: Session = Depends(obtener_db)):
+    """Endpoint de healthcheck para proxies y orquestadores de contenedores."""
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+    return {
+        "status": "ok" if db_status == "ok" else "degraded",
+        "database": db_status,
+    }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
@@ -11,7 +11,12 @@ from backend.esquemas import BalancesMesRespuesta, ProductoTop, ClienteTop
 router = APIRouter(prefix="/balances", tags=["Balances y Estadísticas"])
 
 @router.get("/", response_model=BalancesMesRespuesta)
-def obtener_balances(mes: int, anio: int, db: Session = Depends(obtener_db), usuario_actual = Depends(obtener_usuario_actual)):
+def obtener_balances(
+    mes: int = Query(..., ge=1, le=12, description="Mes (1-12)"),
+    anio: int = Query(..., ge=2000, le=2100, description="Año"),
+    db: Session = Depends(obtener_db),
+    usuario_actual = Depends(obtener_usuario_actual),
+):
     # Obtener todas las cuentas del mes
     cuentas = db.query(CuentaMensual).filter(CuentaMensual.mes == mes, CuentaMensual.anio == anio).all()
     

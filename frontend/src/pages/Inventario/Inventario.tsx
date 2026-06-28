@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import { Search, Edit2, Trash2, ArrowUpDown, Tag, Plus, Archive } from 'lucide-react';
 import SelectorPremium from '../../components/SelectorPremium';
+import ModalConfirmacion from '../../components/ModalConfirmacion';
 import { Producto, Categoria } from '../../types';
 import { servicioProducto, servicioCategoria } from '../../services/api';
 import ModalCategorias from './ModalCategorias';
@@ -18,6 +20,7 @@ const Inventario = () => {
   const [modalCategoriasAbierto, setModalCategoriasAbierto] = useState(false);
   const [modalProductoAbierto, setModalProductoAbierto] = useState(false);
   const [productoEditando, setProductoEditando] = useState<Producto | null>(null);
+  const [pendienteEliminarId, setPendienteEliminarId] = useState<string | null>(null);
 
   // Ordenamiento
   const [ordenConfig, setOrdenConfig] = useState<{ key: keyof Producto, dir: 'asc' | 'desc' } | null>(null);
@@ -42,14 +45,17 @@ const Inventario = () => {
     cargarDatos();
   }, []);
 
-  const handleEliminarProducto = async (id: string) => {
-    if (!window.confirm('¿Seguro que deseas eliminar este producto?')) return;
+  const confirmarEliminarProducto = async () => {
+    if (!pendienteEliminarId) return;
     try {
-      await servicioProducto.eliminar(id);
+      await servicioProducto.eliminar(pendienteEliminarId);
+      toast.success('Producto eliminado.');
       cargarDatos();
-    } catch (err) {
-      console.error('Error al eliminar producto', err);
-      alert('Error al eliminar el producto');
+    } catch (err: any) {
+      const detalle = err.response?.data?.detail || 'Error al eliminar el producto';
+      toast.error(detalle);
+    } finally {
+      setPendienteEliminarId(null);
     }
   };
 
@@ -156,8 +162,8 @@ const Inventario = () => {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="flex-1 border border-white/5 rounded-xl overflow-auto bg-slate-900/30">
+        {/* Tabla (desktop) */}
+        <div className="hidden md:block flex-1 border border-white/5 rounded-xl overflow-auto bg-slate-900/30">
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-slate-800/80 border-b border-white/5 text-slate-300 text-sm font-semibold sticky top-0 backdrop-blur-md z-10">
@@ -207,17 +213,19 @@ const Inventario = () => {
                     </td>
                     <td className="p-4">
                       <div className="flex gap-2 justify-center">
-                        <button 
+                        <button
                           onClick={() => { setProductoEditando(prod); setModalProductoAbierto(true); }}
                           className="p-1.5 bg-slate-800 text-blue-400 hover:text-blue-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
                           title="Editar producto"
+                          aria-label={`Editar ${prod.nombre}`}
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button 
-                          onClick={() => handleEliminarProducto(prod.id)}
+                        <button
+                          onClick={() => setPendienteEliminarId(prod.id)}
                           className="p-1.5 bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
                           title="Eliminar producto"
+                          aria-label={`Eliminar ${prod.nombre}`}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -229,18 +237,84 @@ const Inventario = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Tarjetas (móvil) */}
+        <div className="md:hidden flex-1 overflow-auto space-y-3 -mx-1 px-1">
+          {cargando ? (
+            <p className="p-8 text-center text-slate-500">Cargando...</p>
+          ) : productosFiltradosYOrdenados.length === 0 ? (
+            <div className="p-12 text-center text-slate-500">
+              <Archive className="mx-auto mb-3 opacity-20" size={48} />
+              No se encontraron productos
+            </div>
+          ) : (
+            productosFiltradosYOrdenados.map((prod) => (
+              <div key={prod.id} className="bg-slate-900/40 border border-white/5 rounded-xl p-4">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0">
+                    <p className="text-slate-100 font-semibold truncate">{prod.nombre}</p>
+                    <div className="mt-1.5">
+                      {prod.categoria ? (
+                        <span className="bg-blue-900/30 text-blue-300 px-2.5 py-1 rounded-lg text-xs font-semibold border border-blue-500/20">
+                          {prod.categoria.nombre}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs italic">Sin categoría</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => { setProductoEditando(prod); setModalProductoAbierto(true); }}
+                      className="p-2 bg-slate-800 text-blue-400 hover:text-blue-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
+                      aria-label={`Editar ${prod.nombre}`}
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => setPendienteEliminarId(prod.id)}
+                      className="p-2 bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
+                      aria-label={`Eliminar ${prod.nombre}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center mt-4 pt-3 border-t border-white/5">
+                  <span className="text-slate-300 font-medium">{formatoDinero(prod.precio_actual)}</span>
+                  <span className="text-xs text-slate-500">
+                    Stock:{' '}
+                    <span className={`font-semibold ${prod.stock_actual <= 5 ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {prod.stock_actual}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
-      <ModalCategorias 
-        isOpen={modalCategoriasAbierto} 
-        onClose={() => { setModalCategoriasAbierto(false); cargarDatos(); }} 
+      <ModalCategorias
+        isOpen={modalCategoriasAbierto}
+        onClose={() => { setModalCategoriasAbierto(false); cargarDatos(); }}
       />
-      
-      <ModalProducto 
-        isOpen={modalProductoAbierto} 
+
+      <ModalProducto
+        isOpen={modalProductoAbierto}
         onClose={() => setModalProductoAbierto(false)}
         onSuccess={cargarDatos}
         productoEditar={productoEditando}
+      />
+
+      <ModalConfirmacion
+        isOpen={!!pendienteEliminarId}
+        titulo="Eliminar producto"
+        mensaje="¿Seguro que deseas eliminar este producto? Esta acción no se puede deshacer."
+        textoConfirmar="Eliminar"
+        peligroso
+        onConfirmar={confirmarEliminarProducto}
+        onCancelar={() => setPendienteEliminarId(null)}
       />
     </div>
   );

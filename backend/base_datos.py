@@ -9,8 +9,14 @@ from backend.core.configuracion import configuracion
 if TYPE_CHECKING:
     from backend.modelos import Usuario
 
-# Crear motor
-motor = create_engine(configuracion.database_url, pool_pre_ping=True)
+# Crear motor con pool configurado para producción
+motor = create_engine(
+    configuracion.database_url,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=1800,
+)
 
 # Clase SesionLocal
 SesionLocal = sessionmaker(autocommit=False, autoflush=False, bind=motor)

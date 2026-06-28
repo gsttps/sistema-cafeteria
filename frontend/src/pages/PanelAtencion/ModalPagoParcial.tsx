@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, DollarSign, AlertCircle } from 'lucide-react';
+import { useTeclaEscape } from '../../hooks/useTeclaEscape';
 
 interface ModalPagoParcialProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface ModalPagoParcialProps {
 
 export default function ModalPagoParcial({ isOpen, onClose, onConfirm, totalCuenta }: ModalPagoParcialProps) {
   const [monto, setMonto] = useState<string>(totalCuenta.toString());
+
+  useTeclaEscape(isOpen, onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -34,7 +37,7 @@ export default function ModalPagoParcial({ isOpen, onClose, onConfirm, totalCuen
   const deuda = totalCuenta - numMonto;
 
   const modalContent = (
-    <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 anim-fade-in">
+    <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-md z-modal flex items-center justify-center p-4 anim-fade-in" role="dialog" aria-modal="true" aria-label="Cerrar cuenta">
       <div className="bg-[#0b1120] border border-slate-700/50 rounded-3xl w-full max-w-lg shadow-2xl shadow-black/50 overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b border-slate-800/50 flex justify-between items-center bg-slate-900/30">
@@ -44,8 +47,9 @@ export default function ModalPagoParcial({ isOpen, onClose, onConfirm, totalCuen
             </div>
             <h3 className="font-bold text-xl">Cerrar Cuenta</h3>
           </div>
-          <button 
+          <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
           >
             <X size={20} />

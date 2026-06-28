@@ -1,0 +1,27 @@
+[tool.ruff]
+src = ["backend"]
+line-length = 120
+target-version = "py310"
+exclude = [
+    "backend/alembic/",
+    "backend/tests/",
+]
+
+[tool.ruff.lint]
+# Ruleset inicial para codebase existente:
+# E (pycodestyle errors) + F (pyflakes) + B (bugbear, bugs reales).
+# Escalar gradualmente: añadir "I" (isort), "W" (warnings), "UP" (pyupgrade)
+# una vez que el equipo haya resuelto las violaciones existentes.
+select = ["E", "F", "B"]
+ignore = [
+    "B008",   # FastAPI usa Depends() como argumento por defecto
+    "E501",   # La longitud de línea la controla el formatter
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]

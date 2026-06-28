@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 import { Cliente, Producto, CuentaMensual, Transaccion, Categoria } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -10,6 +11,29 @@ const api = axios.create({
   },
   withCredentials: true, // requerido para autenticación con cookies HttpOnly
 });
+
+// Callback para cuando la sesión expira (401). Lo registra App.tsx.
+let _onSesionExpirada: (() => void) | null = null;
+export const configurarCallbackSesionExpirada = (cb: () => void) => {
+  _onSesionExpirada = cb;
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    const url: string = error.config?.url ?? '';
+
+    if (status === 401 && !url.includes('/auth/login')) {
+      // Sesión expirada o no autenticado — volver al login
+      _onSesionExpirada?.();
+    } else if (status != null && status >= 500) {
+      toast.error('Error en el servidor. Por favor intenta de nuevo.');
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 
 export const servicioCliente = {

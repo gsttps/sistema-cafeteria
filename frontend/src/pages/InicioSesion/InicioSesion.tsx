@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { servicioAuth } from '../../services/api';
+import { Usuario } from '../../types';
 
 interface InicioSesionProps {
-  onLoginExitoso: () => void;
+  onLoginExitoso: (usuario: Usuario) => void;
 }
 
 function InicioSesion({ onLoginExitoso }: InicioSesionProps) {
@@ -24,9 +25,8 @@ function InicioSesion({ onLoginExitoso }: InicioSesionProps) {
     try {
       await servicioAuth.login(username, password);
       // El backend establece la cookie HttpOnly automáticamente
-
-
-      onLoginExitoso();
+      const respMe = await servicioAuth.verificar();
+      onLoginExitoso(respMe.data as Usuario);
     } catch (err: any) {
       if (err.response?.status === 401) {
         setError('Usuario o contraseña incorrectos, intente nuevamente.');
