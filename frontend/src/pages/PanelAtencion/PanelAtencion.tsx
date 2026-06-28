@@ -3,7 +3,7 @@ import { Cliente, CuentaMensual, Producto } from '../../types';
 import { servicioCliente, servicioProducto, servicioCuenta } from '../../services/api';
 import ResumenPestanas from '../../components/ResumenPestanas';
 import SelectorMes from '../../components/SelectorMes';
-import { Plus, Phone, ArrowLeft, Trash2, ArrowDownAZ, Coins, AlertCircle, Edit } from 'lucide-react';
+import { Plus, Phone, ArrowLeft, Trash2, ArrowDownAZ, Coins, AlertCircle, Edit, UtensilsCrossed } from 'lucide-react';
 import MenuDesplegable from '../../components/MenuDesplegable';
 import SelectorPremium from '../../components/SelectorPremium';
 import { formatoDinero, formatearFechaHora } from '../../utils/formato';
@@ -47,6 +47,13 @@ function PanelAtencion() {
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [cargandoCuenta, setCargandoCuenta] = useState(false);
   const [transaccionAEliminar, setTransaccionAEliminar] = useState<string | null>(null);
+
+  // Estados para el modal de pedido personalizado
+  const [mostrarModalPedido, setMostrarModalPedido] = useState(false);
+  const [nombrePedido, setNombrePedido] = useState('');
+  const [precioPedido, setPrecioPedido] = useState('');
+  const [cantidadPedido, setCantidadPedido] = useState(1);
+  const [enviandoPedido, setEnviandoPedido] = useState(false);
 
   // --- GENERAL ACTIONS ---
   
@@ -171,6 +178,37 @@ function PanelAtencion() {
   };
 
 
+
+  // Enviar pedido personalizado
+  const enviarPedidoPersonalizado = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clienteSeleccionado || !cuentaSeleccionada) return;
+    if (cuentaSeleccionada.estado === 'pagada') {
+      alert('No se pueden agregar pedidos a una cuenta ya pagada.');
+      return;
+    }
+    const precio = parseFloat(precioPedido);
+    if (!nombrePedido.trim() || isNaN(precio) || precio <= 0 || cantidadPedido < 1) return;
+
+    setEnviandoPedido(true);
+    try {
+      await servicioCuenta.pedidoPersonalizado(clienteSeleccionado.id, {
+        nombre: nombrePedido.trim(),
+        precio,
+        cantidad: cantidadPedido,
+      });
+      setMostrarModalPedido(false);
+      setNombrePedido('');
+      setPrecioPedido('');
+      setCantidadPedido(1);
+      await refrescarDatosCuenta();
+    } catch (err) {
+      console.error('Error al enviar pedido personalizado:', err);
+      alert('No se pudo registrar el pedido personalizado.');
+    } finally {
+      setEnviandoPedido(false);
+    }
+  };
 
   // Crear cliente rápido
   const guardarNuevoCliente = async (e: React.FormEvent) => {
@@ -520,38 +558,59 @@ function PanelAtencion() {
                       </div>
                     ))}
 
-                    {/* Renderizar transacciones activas */}
-                    {cuentaSeleccionada.transacciones?.map((t: any) => (
-                      <div
-                        key={t.id}
-                        className="p-2.5 sm:p-3 border border-slate-600 rounded-xl bg-slate-700/30 flex justify-between items-center group"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="font-semibold text-slate-200 text-xs sm:text-sm truncate">{t.producto_nombre || 'Producto'}</span>
+                    {/* Renderizar transacciones activas: "Deuda anterior" siempre primero con estilo especial */}
+                    {(() => {
+                      const deudaAnterior = cuentaSeleccionada.transacciones?.filter((t: any) => t.producto_nombre === 'Deuda anterior') || [];
+                      const otrasTransacciones = cuentaSeleccionada.transacciones?.filter((t: any) => t.producto_nombre !== 'Deuda anterior') || [];
+                      const ordenadas = [...deudaAnterior, ...otrasTransacciones];
+                      return ordenadas.map((t: any) => {
+                        const esDeudaAnterior = t.producto_nombre === 'Deuda anterior';
+                        return (
+                          <div
+                            key={t.id}
+                            className={`p-2.5 sm:p-3 rounded-xl flex justify-between items-center group ${
+                              esDeudaAnterior
+                                ? 'border border-amber-500/40 bg-amber-500/5 shadow-sm shadow-amber-500/10'
+                                : 'border border-slate-600 bg-slate-700/30'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                {esDeudaAnterior && (
+                                  <span className="text-[0.6rem] sm:text-[0.65rem] bg-amber-500/20 text-amber-400 border border-amber-500/40 px-1.5 py-0.5 rounded font-bold tracking-wider shrink-0">MONTO ACUMULADO</span>
+                                )}
+                                <span className={`font-semibold text-xs sm:text-sm truncate ${
+                                  esDeudaAnterior ? 'text-amber-300' : 'text-slate-200'
+                                }`}>
+                                  {esDeudaAnterior ? 'Saldo pendiente mes anterior' : (t.producto_nombre || 'Producto')}
+                                </span>
+                              </div>
+                              <div className="text-[0.65rem] sm:text-xs text-slate-400 mt-0.5 sm:mt-1">
+                                {t.cantidad} x {formatoDinero(Number(t.precio_historico))}
+                                <span className="ml-1 sm:ml-2 text-[0.6rem] sm:text-[0.65rem] text-slate-500">{formatearFechaHora(t.fecha_hora)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
+                              <span className={`font-bold text-xs sm:text-sm ${
+                                esDeudaAnterior ? 'text-amber-400' : 'text-slate-200'
+                              }`}>
+                                {formatoDinero(t.cantidad * Number(t.precio_historico))}
+                              </span>
+                              {cuentaSeleccionada.estado === 'abierta' && !esDeudaAnterior && (
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarConsumo(t.id)}
+                                  className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-lg transition-colors focus:outline-none sm:opacity-0 sm:group-hover:opacity-100"
+                                  title="Quitar de la lista"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-[0.65rem] sm:text-xs text-slate-400 mt-0.5 sm:mt-1">
-                            {t.cantidad} x {formatoDinero(Number(t.precio_historico))}
-                            <span className="ml-1 sm:ml-2 text-[0.6rem] sm:text-[0.65rem] text-slate-500">{formatearFechaHora(t.fecha_hora)}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
-                          <span className="font-bold text-slate-200 text-xs sm:text-sm">
-                            {formatoDinero(t.cantidad * Number(t.precio_historico))}
-                          </span>
-                          {cuentaSeleccionada.estado === 'abierta' && (
-                            <button
-                              type="button"
-                              onClick={() => eliminarConsumo(t.id)}
-                              className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-lg transition-colors focus:outline-none sm:opacity-0 sm:group-hover:opacity-100"
-                              title="Quitar de la lista"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>
@@ -559,6 +618,26 @@ function PanelAtencion() {
 
             {/* Columna 2 (Centro): Buscador y lista de productos para agregar */}
             <div className="w-full lg:flex-1 flex flex-col bg-[#0b1120]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6 shadow-2xl shadow-black/40 max-h-[50vh] lg:max-h-[calc(100vh-160px)]">
+              {/* Botón Pedido Personalizado */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (cuentaSeleccionada?.estado === 'pagada') {
+                    alert('No se pueden agregar pedidos a una cuenta ya pagada.');
+                    return;
+                  }
+                  setMostrarModalPedido(true);
+                }}
+                className={`w-full mb-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-all ${
+                  cuentaSeleccionada?.estado === 'pagada'
+                    ? 'bg-slate-800/50 text-slate-500 border-slate-700/50 cursor-not-allowed'
+                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30 hover:border-amber-500/60 cursor-pointer shadow-lg shadow-amber-500/5'
+                }`}
+              >
+                <UtensilsCrossed size={18} />
+                Pedido personalizado
+              </button>
+
               <h4 className="m-0 mb-3 sm:mb-4 text-slate-100 text-base sm:text-lg font-bold">
                 Agregar producto
               </h4>
@@ -750,6 +829,82 @@ function PanelAtencion() {
                 Sí, Eliminar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PEDIDO PERSONALIZADO */}
+      {mostrarModalPedido && (
+        <div className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-50 backdrop-blur-sm anim-fade-in">
+          <div className="bg-slate-800 p-8 rounded-2xl w-11/12 max-w-md shadow-2xl border border-amber-500/20">
+            <div className="flex items-center gap-3 mb-6">
+              <UtensilsCrossed size={28} className="text-amber-400" />
+              <h3 className="m-0 text-slate-100 text-xl font-bold">Pedido Personalizado</h3>
+            </div>
+            <form onSubmit={enviarPedidoPersonalizado} className="space-y-4">
+              <div>
+                <label className="block mb-2 font-semibold text-slate-400 text-sm">Nombre del pedido</label>
+                <input
+                  type="text"
+                  placeholder="Ej. Almuerzo especial vegetariano"
+                  value={nombrePedido}
+                  onChange={(e) => setNombrePedido(e.target.value)}
+                  className="input-premium"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block mb-2 font-semibold text-slate-400 text-sm">Precio unitario ($)</label>
+                <input
+                  type="number"
+                  placeholder="Ej. 3500"
+                  value={precioPedido}
+                  onChange={(e) => setPrecioPedido(e.target.value)}
+                  className="input-premium"
+                  min="1"
+                  step="1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block mb-2 font-semibold text-slate-400 text-sm">Cantidad</label>
+                <input
+                  type="number"
+                  value={cantidadPedido}
+                  onChange={(e) => setCantidadPedido(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="input-premium"
+                  min="1"
+                  required
+                />
+              </div>
+              {nombrePedido && precioPedido && Number(precioPedido) > 0 && (
+                <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl text-sm text-amber-300 font-semibold text-center">
+                  Total: ${(Number(precioPedido) * cantidadPedido).toLocaleString('es-CL')}
+                </div>
+              )}
+              <div className="flex gap-3 justify-end mt-8">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarModalPedido(false);
+                    setNombrePedido('');
+                    setPrecioPedido('');
+                    setCantidadPedido(1);
+                  }}
+                  className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 border-none rounded-xl cursor-pointer font-semibold transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={enviandoPedido}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 border-none rounded-xl cursor-pointer font-bold shadow-lg shadow-amber-500/20 transition-colors"
+                >
+                  {enviandoPedido ? 'Registrando...' : 'Registrar pedido'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from backend.base_datos import obtener_db, obtener_usuario_actual
 from backend.modelos import CuentaMensual, Transaccion, Producto, Cliente, Usuario
-from backend.esquemas import TransaccionCrear, CuentaMensualRespuesta, TransaccionRespuesta, PagoCuentaRequest
+from backend.esquemas import TransaccionCrear, PedidoPersonalizadoCrear, CuentaMensualRespuesta, TransaccionRespuesta, PagoCuentaRequest
 
 router = APIRouter(prefix="/cuentas", tags=["Cuentas Mensuales"])
 
@@ -171,6 +171,69 @@ def agregar_transaccion(
     db.refresh(db_transaccion)
     
     # Agregar nombre del producto para la representación de la respuesta
+    db_transaccion.producto_nombre = producto.nombre
+    return db_transaccion
+
+@router.post("/cliente/{cliente_id}/pedido_personalizado", response_model=TransaccionRespuesta)
+def agregar_pedido_personalizado(
+    cliente_id: UUID,
+    pedido: PedidoPersonalizadoCrear,
+    db: Session = Depends(obtener_db),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+):
+    """Registra un pedido de nombre y precio libre en la cuenta abierta del mes actual.
+    Si ya existe un producto con ese nombre, se reutiliza actualizando su precio.
+    Si no existe, se crea uno nuevo.
+    """
+    # Buscar o crear el producto con ese nombre
+    producto = db.query(Producto).filter(Producto.nombre == pedido.nombre).first()
+    if not producto:
+        producto = Producto(
+            nombre=pedido.nombre,
+            precio_actual=pedido.precio,
+            stock_actual=0
+        )
+        db.add(producto)
+        db.flush()
+    else:
+        # Actualizar precio si cambió
+        producto.precio_actual = pedido.precio
+
+    # Obtener mes y año local actual
+    ahora = datetime.datetime.now()
+    mes = ahora.month
+    anio = ahora.year
+
+    # Obtener o crear cuenta abierta para este mes
+    cuenta = db.query(CuentaMensual).filter(
+        CuentaMensual.cliente_id == cliente_id,
+        CuentaMensual.mes == mes,
+        CuentaMensual.anio == anio,
+        CuentaMensual.estado == "abierta"
+    ).first()
+
+    if not cuenta:
+        cuenta = CuentaMensual(
+            cliente_id=cliente_id,
+            mes=mes,
+            anio=anio,
+            porcentaje_descuento=Decimal("0.00"),
+            estado="abierta"
+        )
+        db.add(cuenta)
+        db.flush()
+
+    # CRÍTICO: Congelar precio histórico al momento del pedido
+    db_transaccion = Transaccion(
+        cuenta_mensual_id=cuenta.id,
+        producto_id=producto.id,
+        cantidad=pedido.cantidad,
+        precio_historico=pedido.precio
+    )
+    db.add(db_transaccion)
+    db.commit()
+    db.refresh(db_transaccion)
+
     db_transaccion.producto_nombre = producto.nombre
     return db_transaccion
 

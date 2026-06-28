@@ -153,6 +153,19 @@ class TransaccionCrear(BaseModel):
     producto_id: UUID
     cantidad: int = Field(1, ge=1)
 
+class PedidoPersonalizadoCrear(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=100)
+    precio: Decimal = Field(..., gt=0)
+    cantidad: int = Field(1, ge=1)
+
+    @field_validator('nombre')
+    @classmethod
+    def validar_nombre_pedido(cls, v: str) -> str:
+        res = evitar_html_y_scripts(v)
+        if res is None:
+            raise ValueError("El nombre del pedido no puede estar vacío.")
+        return res
+
 class TransaccionRespuesta(BaseModel):
     id: UUID
     cuenta_mensual_id: UUID

@@ -44,6 +44,8 @@ export const servicioCuenta = {
   cerrar: (cuentaId: string, monto_pagado?: number) => 
     api.put<CuentaMensual>(`/cuentas/${cuentaId}/cerrar`, { monto_pagado }),
   eliminarTransaccion: (transaccionId: string) => api.delete(`/cuentas/transaccion/${transaccionId}`),
+  pedidoPersonalizado: (clienteId: string, datos: { nombre: string; precio: number; cantidad: number }) =>
+    api.post<Transaccion>(`/cuentas/cliente/${clienteId}/pedido_personalizado`, datos),
 };
 
 export const servicioAuth = {
