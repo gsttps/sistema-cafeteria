@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Cliente, Producto, CuentaMensual, Transaccion, Categoria } from '../types';
+import { Cliente, Producto, CuentaMensual, Transaccion, Categoria, PerdidaInventario, ProductoImpacto } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -52,9 +52,19 @@ export const servicioCategoria = {
 
 export const servicioProducto = {
   obtenerTodos: (buscar?: string) => api.get<Producto[]>('/productos/', { params: { buscar } }),
-  crear: (datos: Omit<Producto, 'id'>) => api.post<Producto>('/productos/', datos),
-  actualizar: (id: string, datos: Omit<Producto, 'id'>) => api.put<Producto>(`/productos/${id}`, datos),
-  eliminar: (id: string) => api.delete(`/productos/${id}`),
+  crear: (datos: Omit<Producto, 'id' | 'estado'>) => api.post<Producto>('/productos/', datos),
+  actualizar: (id: string, datos: Partial<Omit<Producto, 'id' | 'estado'>> & { actualizar_precios_abiertos?: boolean }) =>
+    api.put<Producto>(`/productos/${id}`, datos),
+  eliminar: (id: string) => api.delete<{ resultado: 'archivado' | 'eliminado' }>(`/productos/${id}`),
+  obtenerImpacto: (id: string) => api.get<ProductoImpacto>(`/productos/${id}/impacto`),
+};
+
+export const servicioPerdida = {
+  obtenerTodas: (productoId?: string) =>
+    api.get<PerdidaInventario[]>('/perdidas/', { params: { producto_id: productoId } }),
+  crear: (datos: { producto_id: string; cantidad: number; motivo?: string }) =>
+    api.post<PerdidaInventario>('/perdidas/', datos),
+  eliminar: (id: string) => api.delete(`/perdidas/${id}`),
 };
 
 export const servicioCuenta = {

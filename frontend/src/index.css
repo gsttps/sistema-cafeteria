@@ -33,12 +33,19 @@
     animation: gradientAnimation 15s ease infinite;
   }
   
+  /* Sin fill-mode "forwards": con "forwards" el navegador retiene el último
+     transform INTERPOLADO (una matriz identidad matrix(1,0,0,1,0,0)), que
+     para el spec de CSS NO es lo mismo que "none" y igual convierte al
+     elemento en el containing block de los modales position:fixed hijos
+     (dejan de centrarse en el viewport). Sin "forwards", al terminar la
+     animación el elemento vuelve a su transform/opacity base (none / 1),
+     que ya coincide visualmente con el estado final deseado. */
   .anim-fade-in {
-    animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   .anim-slide-in {
-    animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 }
 

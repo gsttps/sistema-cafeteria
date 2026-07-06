@@ -1,0 +1,33 @@
+# Despliegue local actual:
+# - Reutiliza la base de datos ya corriendo (contenedor cafe_postgres del
+#   docker-compose.yml, alias "db" en la red cafeteria-gestion_default).
+# - Expone el frontend en http://localhost:8080 (nginx proxya /api al backend).
+#
+# Uso:
+#   docker compose -f docker-compose.deploy.yml up -d --build
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: cafe_backend_prod
+    restart: always
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cafe_frontend_prod
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+networks:
+  default:
+    name: cafeteria-gestion_default
+    external: true

@@ -131,6 +131,9 @@ class ProductoActualizar(BaseModel):
     precio_actual: Optional[Decimal] = Field(None, gt=0)
     stock_actual: Optional[int] = Field(None, ge=0)
     categoria_id: Optional[UUID] = None
+    actualizar_precios_abiertos: bool = Field(
+        False, description="Si el precio cambió, aplicarlo también a los consumos de cuentas abiertas (las pagadas nunca se tocan)"
+    )
 
     @field_validator('nombre')
     @classmethod
@@ -145,8 +148,53 @@ class ProductoRespuesta(BaseModel):
     stock_actual: int
     categoria_id: Optional[UUID] = None
     categoria: Optional[CategoriaRespuesta] = None
+    estado: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ImpactoCuentas(BaseModel):
+    clientes: int
+    transacciones: int
+    unidades: int
+
+
+class ProductoImpactoRespuesta(BaseModel):
+    producto_id: UUID
+    nombre: str
+    estado: str
+    cuentas_abiertas: ImpactoCuentas
+    cuentas_pagadas: ImpactoCuentas
+    perdidas: int
+    tiene_uso: bool
+
+
+class EliminarProductoRespuesta(BaseModel):
+    resultado: str # 'archivado' o 'eliminado'
+
+# --- ESQUEMAS DE PERDIDA DE INVENTARIO ---
+class PerdidaCrear(BaseModel):
+    producto_id: UUID
+    cantidad: int = Field(1, ge=1)
+    motivo: Optional[str] = Field(None, max_length=200)
+
+    @field_validator('motivo')
+    @classmethod
+    def validar_motivo(cls, v: Optional[str]) -> Optional[str]:
+        return evitar_html_y_scripts(v)
+
+
+class PerdidaRespuesta(BaseModel):
+    id: UUID
+    producto_id: UUID
+    producto_nombre: Optional[str] = None # Agregado para facilitar lectura en la interfaz
+    cantidad: int
+    motivo: Optional[str] = None
+    costo_historico: Decimal
+    fecha_hora: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 # --- ESQUEMAS DE TRANSACCION ---
 class TransaccionCrear(BaseModel):

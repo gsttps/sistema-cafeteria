@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 from uuid import UUID
 
 from backend.base_datos import obtener_db, obtener_usuario_actual
-from backend.modelos import Cliente, Usuario
+from backend.modelos import Cliente, CuentaMensual, Usuario
 from backend.esquemas import ClienteCrear, ClienteActualizar, ClienteRespuesta
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
@@ -18,7 +18,11 @@ def leer_clientes(
     db: Session = Depends(obtener_db),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
 ):
-    consulta = db.query(Cliente)
+    # Eager loading: la propiedad "deuda" recorre cuentas y transacciones de
+    # cada cliente; sin esto el listado emite cientos de queries (N+1)
+    consulta = db.query(Cliente).options(
+        selectinload(Cliente.cuentas).selectinload(CuentaMensual.transacciones)
+    )
     if buscar:
         consulta = consulta.filter(Cliente.nombre.ilike(f"%{buscar}%"))
     return consulta.offset(skip).limit(limit).all()

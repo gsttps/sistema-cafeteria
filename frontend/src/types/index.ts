@@ -25,6 +25,33 @@ export interface Producto {
   stock_actual: number;
   categoria_id?: string | null;
   categoria?: Categoria | null;
+  estado: 'activo' | 'archivado';
+}
+
+export interface ImpactoCuentas {
+  clientes: number;
+  transacciones: number;
+  unidades: number;
+}
+
+export interface ProductoImpacto {
+  producto_id: string;
+  nombre: string;
+  estado: 'activo' | 'archivado';
+  cuentas_abiertas: ImpactoCuentas;
+  cuentas_pagadas: ImpactoCuentas;
+  perdidas: number;
+  tiene_uso: boolean;
+}
+
+export interface PerdidaInventario {
+  id: string;
+  producto_id: string;
+  producto_nombre?: string;
+  cantidad: number;
+  motivo?: string | null;
+  costo_historico: number;
+  fecha_hora: string;
 }
 
 export interface CuentaMensual {

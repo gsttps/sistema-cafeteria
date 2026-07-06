@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle } from 'lucide-react';
-import { Producto, Categoria } from '../../types';
+import { toast } from 'sonner';
+import { Producto, Categoria, ProductoImpacto } from '../../types';
 import { servicioProducto, servicioCategoria } from '../../services/api';
 import SelectorPremium from '../../components/SelectorPremium';
 import { useTeclaEscape } from '../../hooks/useTeclaEscape';
+import ModalImpactoProducto from './ModalImpactoProducto';
 
 interface ModalProductoProps {
   isOpen: boolean;
@@ -17,10 +19,14 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
   const [precioActual, setPrecioActual] = useState<number | ''>('');
   const [stockActual, setStockActual] = useState<number | ''>(0);
   const [categoriaId, setCategoriaId] = useState<string>('ninguna');
-  
+
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Impacto en clientes al cambiar el precio de un producto ya en uso
+  const [impactoPrecio, setImpactoPrecio] = useState<ProductoImpacto | null>(null);
+  const [payloadPendiente, setPayloadPendiente] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -37,6 +43,8 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
         setCategoriaId('ninguna');
       }
       setError(null);
+      setImpactoPrecio(null);
+      setPayloadPendiente(null);
     }
   }, [isOpen, productoEditar]);
 
@@ -49,27 +57,17 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
     }
   };
 
-  const handleGuardar = async () => {
-    if (!nombre.trim() || precioActual === '') {
-      setError('Por favor, completa los campos requeridos (Nombre y Precio)');
-      return;
-    }
-
+  const guardarProducto = async (payload: Record<string, unknown>) => {
     setCargando(true);
     setError(null);
-
     try {
-      const payload = {
-        nombre: nombre.trim(),
-        precio_actual: Number(precioActual),
-        stock_actual: Number(stockActual),
-        categoria_id: categoriaId === 'ninguna' ? null : categoriaId
-      };
-
       if (productoEditar) {
         await servicioProducto.actualizar(productoEditar.id, payload);
+        if (payload.actualizar_precios_abiertos) {
+          toast.success('Precio actualizado también en los consumos de cuentas abiertas.');
+        }
       } else {
-        await servicioProducto.crear(payload);
+        await servicioProducto.crear(payload as Omit<Producto, 'id' | 'estado'>);
       }
       onSuccess();
       onClose();
@@ -77,6 +75,47 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
       setError(err.response?.data?.detail || 'Error al guardar el producto');
     } finally {
       setCargando(false);
+      setImpactoPrecio(null);
+      setPayloadPendiente(null);
+    }
+  };
+
+  const handleGuardar = async () => {
+    if (!nombre.trim() || precioActual === '') {
+      setError('Por favor, completa los campos requeridos (Nombre y Precio)');
+      return;
+    }
+
+    const payload = {
+      nombre: nombre.trim(),
+      precio_actual: Number(precioActual),
+      stock_actual: Number(stockActual),
+      categoria_id: categoriaId === 'ninguna' ? null : categoriaId,
+    };
+
+    const precioCambio = productoEditar != null && Number(precioActual) !== Number(productoEditar.precio_actual);
+    if (!precioCambio) {
+      guardarProducto(payload);
+      return;
+    }
+
+    // El precio cambió y el producto ya existía: consultar si hay consumos
+    // en cuentas abiertas antes de decidir si tocarlos o no
+    setCargando(true);
+    setError(null);
+    try {
+      const { data } = await servicioProducto.obtenerImpacto(productoEditar!.id);
+      if (data.cuentas_abiertas.transacciones > 0) {
+        setImpactoPrecio(data);
+        setPayloadPendiente(payload);
+        setCargando(false);
+      } else {
+        await guardarProducto({ ...payload, actualizar_precios_abiertos: false });
+      }
+    } catch (err) {
+      console.error('Error al obtener impacto del producto:', err);
+      // Sin impacto disponible, se guarda directo sin tocar históricos (comportamiento seguro por defecto)
+      await guardarProducto({ ...payload, actualizar_precios_abiertos: false });
     }
   };
 
@@ -85,7 +124,8 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={productoEditar ? 'Editar producto' : 'Nuevo producto'}>
+    <>
+      <div className="fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={productoEditar ? 'Editar producto' : 'Nuevo producto'}>
       <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
@@ -117,7 +157,7 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
             <label className="block text-slate-400 text-sm font-semibold mb-2">
               Nombre del Producto *
             </label>
-            <input 
+            <input
               type="text"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
@@ -131,7 +171,7 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
               <label className="block text-slate-400 text-sm font-semibold mb-2">
                 Precio ($) *
               </label>
-              <input 
+              <input
                 type="number"
                 value={precioActual}
                 onChange={(e) => setPrecioActual(e.target.value ? Number(e.target.value) : '')}
@@ -144,7 +184,7 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
               <label className="block text-slate-400 text-sm font-semibold mb-2">
                 Stock / Cantidad
               </label>
-              <input 
+              <input
                 type="number"
                 value={stockActual}
                 onChange={(e) => setStockActual(e.target.value ? Number(e.target.value) : '')}
@@ -172,13 +212,13 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
         </div>
 
         <div className="p-6 border-t border-white/5 bg-slate-900/30 flex justify-end gap-3">
-          <button 
+          <button
             onClick={onClose}
             className="px-4 py-2 text-slate-300 font-medium hover:text-white hover:bg-white/5 rounded-xl transition-colors"
           >
             Cancelar
           </button>
-          <button 
+          <button
             onClick={handleGuardar}
             disabled={cargando}
             className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl transition-colors font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50"
@@ -188,7 +228,22 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
           </button>
         </div>
       </div>
-    </div>
+      </div>
+
+      <ModalImpactoProducto
+        isOpen={!!impactoPrecio}
+        modo="editar-precio"
+        impacto={impactoPrecio}
+        nested
+        cargando={cargando}
+        precioAnterior={productoEditar?.precio_actual}
+        precioNuevo={typeof precioActual === 'number' ? precioActual : undefined}
+        onConfirmar={(actualizarPreciosAbiertos) => {
+          if (payloadPendiente) guardarProducto({ ...payloadPendiente, actualizar_precios_abiertos: actualizarPreciosAbiertos });
+        }}
+        onCancelar={() => { setImpactoPrecio(null); setPayloadPendiente(null); }}
+      />
+    </>
   );
 };
 

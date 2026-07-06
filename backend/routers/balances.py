@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func
 from typing import List
 from decimal import Decimal
@@ -17,8 +17,17 @@ def obtener_balances(
     db: Session = Depends(obtener_db),
     usuario_actual = Depends(obtener_usuario_actual),
 ):
-    # Obtener todas las cuentas del mes
-    cuentas = db.query(CuentaMensual).filter(CuentaMensual.mes == mes, CuentaMensual.anio == anio).all()
+    # Obtener todas las cuentas del mes (eager loading: el bucle recorre las
+    # transacciones y el cliente de cada cuenta; sin esto son queries N+1)
+    cuentas = (
+        db.query(CuentaMensual)
+        .options(
+            selectinload(CuentaMensual.transacciones),
+            joinedload(CuentaMensual.cliente),
+        )
+        .filter(CuentaMensual.mes == mes, CuentaMensual.anio == anio)
+        .all()
+    )
     
     total_pagado = Decimal("0.00")
     total_pendiente = Decimal("0.00")

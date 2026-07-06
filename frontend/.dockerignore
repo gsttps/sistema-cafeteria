@@ -1,0 +1,3 @@
+# El node_modules del host (glibc) no debe pisar el del contenedor (musl)
+node_modules
+dist

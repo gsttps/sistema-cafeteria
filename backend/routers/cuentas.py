@@ -1,6 +1,6 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
 from uuid import UUID
 from decimal import Decimal
@@ -38,7 +38,9 @@ def ayudante_calcular_cuenta(cuenta: CuentaMensual, db: Optional[Session] = None
     total_ya_pagado = Decimal("0.00")
     
     if db:
-        cuentas_pagadas = db.query(CuentaMensual).filter(
+        cuentas_pagadas = db.query(CuentaMensual).options(
+            selectinload(CuentaMensual.transacciones).joinedload(Transaccion.producto)
+        ).filter(
             CuentaMensual.cliente_id == cuenta.cliente_id,
             CuentaMensual.mes == cuenta.mes,
             CuentaMensual.anio == cuenta.anio,
@@ -100,13 +102,15 @@ def leer_cuenta_actual(
         anio = ahora.year
     
     # Intentar buscar una cuenta abierta para el mes solicitado
-    cuenta = db.query(CuentaMensual).filter(
+    cuenta = db.query(CuentaMensual).options(
+        selectinload(CuentaMensual.transacciones).joinedload(Transaccion.producto)
+    ).filter(
         CuentaMensual.cliente_id == cliente_id,
         CuentaMensual.mes == mes,
         CuentaMensual.anio == anio,
         CuentaMensual.estado == "abierta"
     ).first()
-    
+
     # Si no hay cuenta abierta, crear una nueva (incluso si hay una pagada)
     if not cuenta:
         cuenta = CuentaMensual(
@@ -133,12 +137,14 @@ def agregar_transaccion(
     producto = db.query(Producto).filter(Producto.id == item_in.producto_id).first()
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-        
+    if producto.estado == "archivado":
+        raise HTTPException(status_code=409, detail="El producto está archivado y no se puede vender")
+
     # Obtener mes y año local actual
     ahora = datetime.datetime.now()
     mes = ahora.month
     anio = ahora.year
-    
+
     # Obtener o crear cuenta abierta para este mes
     cuenta = db.query(CuentaMensual).filter(
         CuentaMensual.cliente_id == cliente_id,
@@ -146,7 +152,7 @@ def agregar_transaccion(
         CuentaMensual.anio == anio,
         CuentaMensual.estado == "abierta"
     ).first()
-    
+
     if not cuenta:
         cuenta = CuentaMensual(
             cliente_id=cliente_id,
@@ -198,6 +204,8 @@ def agregar_pedido_personalizado(
     else:
         # Actualizar precio si cambió
         producto.precio_actual = pedido.precio
+        if producto.estado == "archivado":
+            producto.estado = "activo"
 
     # Obtener mes y año local actual
     ahora = datetime.datetime.now()
@@ -344,10 +352,12 @@ def leer_historial_cuentas(
     db: Session = Depends(obtener_db),
     usuario_actual: Usuario = Depends(obtener_usuario_actual)
 ):
-    cuentas = db.query(CuentaMensual).filter(
+    cuentas = db.query(CuentaMensual).options(
+        selectinload(CuentaMensual.transacciones).joinedload(Transaccion.producto)
+    ).filter(
         CuentaMensual.cliente_id == cliente_id
     ).order_by(CuentaMensual.anio.desc(), CuentaMensual.mes.desc()).all()
-    
+
     return [ayudante_calcular_cuenta(c, db=db) for c in cuentas]
 
 @router.delete("/transaccion/{transaccion_id}", status_code=status.HTTP_204_NO_CONTENT)

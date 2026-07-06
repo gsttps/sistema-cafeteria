@@ -60,10 +60,26 @@ class Producto(Base):
     precio_actual = Column(Numeric(10, 2), nullable=False)
     stock_actual = Column(Integer, nullable=False, default=0)
     categoria_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    estado = Column(String(20), default="activo", nullable=False, index=True) # 'activo' o 'archivado'
 
     # Relaciones
     categoria = relationship("Categoria", back_populates="productos")
     transacciones = relationship("Transaccion", back_populates="producto", cascade="all, delete-orphan")
+    perdidas = relationship("PerdidaInventario", back_populates="producto", cascade="all, delete-orphan")
+
+class PerdidaInventario(Base):
+    """Registro de mermas de inventario (producto roto, vencido, derramado, etc.)."""
+    __tablename__ = "inventory_losses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    producto_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    cantidad = Column(Integer, default=1, nullable=False)
+    motivo = Column(String(200), nullable=True)
+    costo_historico = Column(Numeric(10, 2), nullable=False) # Congela el precio al momento de la pérdida
+    fecha_hora = Column(DateTime(timezone=True), default=utc_ahora, nullable=False)
+
+    # Relaciones
+    producto = relationship("Producto", back_populates="perdidas")
 
 class CuentaMensual(Base):
     __tablename__ = "monthly_tabs"

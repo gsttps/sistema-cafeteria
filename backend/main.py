@@ -4,7 +4,17 @@ import secrets
 import shutil
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, status
+from fastapi import (
+    FastAPI,
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    File,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -14,13 +24,31 @@ from jose import jwt, JWTError
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from backend.core.configuracion import configuracion, obtener_hash_contrasena, verificar_contrasena, crear_token_acceso
-from backend.base_datos import obtener_db, obtener_usuario_actual, SesionLocal, _extraer_token
+from backend.core.configuracion import (
+    configuracion,
+    obtener_hash_contrasena,
+    verificar_contrasena,
+    crear_token_acceso,
+)
+from backend.base_datos import (
+    obtener_db,
+    obtener_usuario_actual,
+    SesionLocal,
+    _extraer_token,
+)
 from backend.modelos import Usuario
-from backend.esquemas import UsuarioCrear, UsuarioRespuesta, Token, CambiarUsername, CambiarPassword
-from backend.routers import clientes, productos, cuentas, balances, categorias
+from backend.esquemas import (
+    UsuarioCrear,
+    UsuarioRespuesta,
+    Token,
+    CambiarUsername,
+    CambiarPassword,
+)
+from backend.routers import clientes, productos, cuentas, balances, categorias, perdidas
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 # Directorio para almacenar el logo personalizado
@@ -29,25 +57,35 @@ LOGO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 # Configuración del limitador de peticiones (Rate Limiting)
 limiter = Limiter(key_func=get_remote_address)
 
+
 # --- EVENTO DE INICIO: crear usuario admin inicial si no existe ningún usuario ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SesionLocal()
     try:
         if db.query(Usuario).count() == 0:
-            password_inicial = configuracion.ADMIN_INITIAL_PASSWORD or secrets.token_urlsafe(16)
+            password_inicial = (
+                configuracion.ADMIN_INITIAL_PASSWORD or secrets.token_urlsafe(16)
+            )
             usuario_admin = Usuario(
                 username="admin",
                 password_hash=obtener_hash_contrasena(password_inicial),
-                rol="admin"
+                rol="admin",
             )
             db.add(usuario_admin)
             db.commit()
             if configuracion.ADMIN_INITIAL_PASSWORD:
-                logger.info("Usuario admin inicial creado con la contraseña configurada en ADMIN_INITIAL_PASSWORD.")
+                logger.info(
+                    "Usuario admin inicial creado con la contraseña configurada en ADMIN_INITIAL_PASSWORD."
+                )
             else:
-                logger.warning("ADMIN_INITIAL_PASSWORD no definida. Contraseña generada automáticamente: %s", password_inicial)
-                logger.warning("Cambia esta contraseña desde el Panel Admin antes de usar el sistema en producción.")
+                logger.warning(
+                    "ADMIN_INITIAL_PASSWORD no definida. Contraseña generada automáticamente: %s",
+                    password_inicial,
+                )
+                logger.warning(
+                    "Cambia esta contraseña desde el Panel Admin antes de usar el sistema en producción."
+                )
     finally:
         db.close()
     yield
@@ -56,7 +94,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=configuracion.PROJECT_NAME,
     openapi_url=f"{configuracion.API_V1_STR}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Añadir manejador de errores de Rate Limiting al servidor
@@ -86,7 +124,9 @@ def _construir_csp() -> str:
         f"connect-src {connect_src};"
     )
 
+
 _CSP_HEADER = _construir_csp()
+
 
 # Middleware para añadir Cabeceras de Seguridad (Mitigación XSS, Clickjacking, MIME-sniffing)
 @app.middleware("http")
@@ -125,10 +165,12 @@ def login(
     request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(obtener_db)
+    db: Session = Depends(obtener_db),
 ):
     usuario = db.query(Usuario).filter(Usuario.username == form_data.username).first()
-    if not usuario or not verificar_contrasena(form_data.password, usuario.password_hash):
+    if not usuario or not verificar_contrasena(
+        form_data.password, usuario.password_hash
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
@@ -150,6 +192,7 @@ def obtener_perfil(usuario_actual: Usuario = Depends(obtener_usuario_actual)):
 
 # --- CAMBIO DE CREDENCIALES ---
 
+
 @auth_router.put("/cambiar-username", response_model=UsuarioRespuesta)
 def cambiar_username(
     datos: CambiarUsername,
@@ -161,14 +204,16 @@ def cambiar_username(
     if not verificar_contrasena(datos.password_actual, usuario_actual.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La contraseña actual es incorrecta"
+            detail="La contraseña actual es incorrecta",
         )
     # Verificar que el nuevo nombre no esté en uso
-    existente = db.query(Usuario).filter(Usuario.username == datos.username_nuevo).first()
+    existente = (
+        db.query(Usuario).filter(Usuario.username == datos.username_nuevo).first()
+    )
     if existente and existente.id != usuario_actual.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El nombre de usuario ya está en uso por otra cuenta"
+            detail="El nombre de usuario ya está en uso por otra cuenta",
         )
 
     usuario_actual.username = datos.username_nuevo
@@ -192,7 +237,7 @@ def cambiar_password(
     if not verificar_contrasena(datos.password_actual, usuario_actual.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La contraseña actual es incorrecta"
+            detail="La contraseña actual es incorrecta",
         )
 
     usuario_actual.password_hash = obtener_hash_contrasena(datos.password_nueva)
@@ -206,6 +251,7 @@ def cambiar_password(
 
 # --- LOGO PERSONALIZADO ---
 
+
 @auth_router.post("/logo")
 async def subir_logo(
     archivo: UploadFile = File(...),
@@ -215,7 +261,7 @@ async def subir_logo(
     if archivo.content_type not in ["image/jpeg", "image/png"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Solo se permiten archivos JPG o PNG"
+            detail="Solo se permiten archivos JPG o PNG",
         )
 
     ext = ".jpg" if "jpeg" in archivo.content_type else ".png"
@@ -262,6 +308,7 @@ def eliminar_logo(
 
 # --- REGISTRO DE USUARIOS ---
 
+
 @auth_router.post("/register", response_model=UsuarioRespuesta)
 def registrar_usuario(
     usuario_in: UsuarioCrear,
@@ -269,11 +316,13 @@ def registrar_usuario(
     db: Session = Depends(obtener_db),
 ):
     # Comprobar si el usuario ya existe
-    usuario_existente = db.query(Usuario).filter(Usuario.username == usuario_in.username).first()
+    usuario_existente = (
+        db.query(Usuario).filter(Usuario.username == usuario_in.username).first()
+    )
     if usuario_existente:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El nombre de usuario ya está registrado"
+            detail="El nombre de usuario ya está registrado",
         )
 
     # Permitir registrar el primer usuario sin token de administrador
@@ -283,40 +332,69 @@ def registrar_usuario(
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Se requiere token de administrador para registrar nuevos usuarios"
+                detail="Se requiere token de administrador para registrar nuevos usuarios",
             )
         try:
-            payload = jwt.decode(token, configuracion.SECRET_KEY, algorithms=[configuracion.ALGORITHM])
+            payload = jwt.decode(
+                token, configuracion.SECRET_KEY, algorithms=[configuracion.ALGORITHM]
+            )
             nombre_usuario: str | None = payload.get("sub")
             rol: str | None = payload.get("rol")
             if not nombre_usuario or rol != "admin":
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Solo los administradores pueden registrar nuevos usuarios"
+                    detail="Solo los administradores pueden registrar nuevos usuarios",
                 )
         except JWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token inválido o expirado"
+                detail="Token inválido o expirado",
             )
 
     db_usuario = Usuario(
         username=usuario_in.username,
         password_hash=obtener_hash_contrasena(usuario_in.password),
-        rol=usuario_in.rol
+        rol=usuario_in.rol,
     )
     db.add(db_usuario)
     db.commit()
     db.refresh(db_usuario)
     return db_usuario
 
+
 # Incluir routers
 app.include_router(auth_router, prefix=configuracion.API_V1_STR)
-app.include_router(clientes.router, dependencies=[Depends(obtener_usuario_actual)], prefix=configuracion.API_V1_STR)
-app.include_router(productos.router, dependencies=[Depends(obtener_usuario_actual)], prefix=configuracion.API_V1_STR)
-app.include_router(cuentas.router, dependencies=[Depends(obtener_usuario_actual)], prefix=configuracion.API_V1_STR)
-app.include_router(balances.router, dependencies=[Depends(obtener_usuario_actual)], prefix=configuracion.API_V1_STR)
-app.include_router(categorias.router, dependencies=[Depends(obtener_usuario_actual)], prefix=configuracion.API_V1_STR)
+app.include_router(
+    clientes.router,
+    dependencies=[Depends(obtener_usuario_actual)],
+    prefix=configuracion.API_V1_STR,
+)
+app.include_router(
+    productos.router,
+    dependencies=[Depends(obtener_usuario_actual)],
+    prefix=configuracion.API_V1_STR,
+)
+app.include_router(
+    cuentas.router,
+    dependencies=[Depends(obtener_usuario_actual)],
+    prefix=configuracion.API_V1_STR,
+)
+app.include_router(
+    balances.router,
+    dependencies=[Depends(obtener_usuario_actual)],
+    prefix=configuracion.API_V1_STR,
+)
+app.include_router(
+    categorias.router,
+    dependencies=[Depends(obtener_usuario_actual)],
+    prefix=configuracion.API_V1_STR,
+)
+app.include_router(
+    perdidas.router,
+    dependencies=[Depends(obtener_usuario_actual)],
+    prefix=configuracion.API_V1_STR,
+)
+
 
 @app.get("/")
 def raiz():

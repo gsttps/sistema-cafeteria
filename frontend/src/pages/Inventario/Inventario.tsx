@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Search, Edit2, Trash2, ArrowUpDown, Tag, Plus, Archive } from 'lucide-react';
+import { Search, Edit2, Trash2, ArrowUpDown, Tag, Plus, Archive, PackageX } from 'lucide-react';
 import SelectorPremium from '../../components/SelectorPremium';
 import ModalConfirmacion from '../../components/ModalConfirmacion';
-import { Producto, Categoria } from '../../types';
+import { Producto, Categoria, ProductoImpacto } from '../../types';
 import { servicioProducto, servicioCategoria } from '../../services/api';
 import ModalCategorias from './ModalCategorias';
 import ModalProducto from './ModalProducto';
+import ModalPerdida from './ModalPerdida';
+import ModalHistorialPerdidas from './ModalHistorialPerdidas';
+import ModalImpactoProducto from './ModalImpactoProducto';
 import { formatoDinero } from '../../utils/formato';
 
 const Inventario = () => {
@@ -20,7 +23,16 @@ const Inventario = () => {
   const [modalCategoriasAbierto, setModalCategoriasAbierto] = useState(false);
   const [modalProductoAbierto, setModalProductoAbierto] = useState(false);
   const [productoEditando, setProductoEditando] = useState<Producto | null>(null);
-  const [pendienteEliminarId, setPendienteEliminarId] = useState<string | null>(null);
+  const [productoPerdida, setProductoPerdida] = useState<Producto | null>(null);
+  const [modalHistorialPerdidasAbierto, setModalHistorialPerdidasAbierto] = useState(false);
+
+  // Flujo de eliminación: primero se consulta el impacto en clientes.
+  // Sin uso -> confirmación simple. Con uso -> modal de impacto (se archiva).
+  const [cargandoImpactoId, setCargandoImpactoId] = useState<string | null>(null);
+  const [pendienteEliminarSimple, setPendienteEliminarSimple] = useState<Producto | null>(null);
+  const [productoArchivando, setProductoArchivando] = useState<Producto | null>(null);
+  const [impactoArchivar, setImpactoArchivar] = useState<ProductoImpacto | null>(null);
+  const [procesandoEliminar, setProcesandoEliminar] = useState(false);
 
   // Ordenamiento
   const [ordenConfig, setOrdenConfig] = useState<{ key: keyof Producto, dir: 'asc' | 'desc' } | null>(null);
@@ -45,18 +57,51 @@ const Inventario = () => {
     cargarDatos();
   }, []);
 
-  const confirmarEliminarProducto = async () => {
-    if (!pendienteEliminarId) return;
+  const iniciarEliminarProducto = async (prod: Producto) => {
+    setCargandoImpactoId(prod.id);
     try {
-      await servicioProducto.eliminar(pendienteEliminarId);
-      toast.success('Producto eliminado.');
+      const { data } = await servicioProducto.obtenerImpacto(prod.id);
+      if (data.tiene_uso) {
+        setProductoArchivando(prod);
+        setImpactoArchivar(data);
+      } else {
+        setPendienteEliminarSimple(prod);
+      }
+    } catch (err) {
+      console.error('Error al obtener impacto del producto:', err);
+      setPendienteEliminarSimple(prod); // fallback: confirmación simple
+    } finally {
+      setCargandoImpactoId(null);
+    }
+  };
+
+  const eliminarProducto = async (id: string) => {
+    try {
+      const { data } = await servicioProducto.eliminar(id);
+      toast.success(
+        data.resultado === 'archivado'
+          ? 'Producto archivado. El historial de los clientes se mantiene intacto.'
+          : 'Producto eliminado.'
+      );
       cargarDatos();
     } catch (err: any) {
-      const detalle = err.response?.data?.detail || 'Error al eliminar el producto';
-      toast.error(detalle);
-    } finally {
-      setPendienteEliminarId(null);
+      toast.error(err.response?.data?.detail || 'Error al eliminar el producto');
     }
+  };
+
+  const confirmarEliminarSimple = async () => {
+    if (!pendienteEliminarSimple) return;
+    await eliminarProducto(pendienteEliminarSimple.id);
+    setPendienteEliminarSimple(null);
+  };
+
+  const confirmarArchivar = async () => {
+    if (!productoArchivando) return;
+    setProcesandoEliminar(true);
+    await eliminarProducto(productoArchivando.id);
+    setProcesandoEliminar(false);
+    setProductoArchivando(null);
+    setImpactoArchivar(null);
   };
 
   const handleSort = (key: keyof Producto) => {
@@ -116,7 +161,14 @@ const Inventario = () => {
         </div>
         
         <div className="flex gap-3">
-          <button 
+          <button
+            onClick={() => setModalHistorialPerdidasAbierto(true)}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 px-4 rounded-xl border border-slate-600 transition-all duration-200 flex items-center gap-2"
+          >
+            <PackageX size={18} />
+            Pérdidas
+          </button>
+          <button
             onClick={() => setModalCategoriasAbierto(true)}
             className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 px-4 rounded-xl border border-slate-600 transition-all duration-200 flex items-center gap-2"
           >
@@ -214,6 +266,14 @@ const Inventario = () => {
                     <td className="p-4">
                       <div className="flex gap-2 justify-center">
                         <button
+                          onClick={() => setProductoPerdida(prod)}
+                          className="p-1.5 bg-slate-800 text-amber-400 hover:text-amber-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
+                          title="Registrar pérdida (roto, vencido, etc.)"
+                          aria-label={`Registrar pérdida de ${prod.nombre}`}
+                        >
+                          <PackageX size={16} />
+                        </button>
+                        <button
                           onClick={() => { setProductoEditando(prod); setModalProductoAbierto(true); }}
                           className="p-1.5 bg-slate-800 text-blue-400 hover:text-blue-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
                           title="Editar producto"
@@ -222,8 +282,9 @@ const Inventario = () => {
                           <Edit2 size={16} />
                         </button>
                         <button
-                          onClick={() => setPendienteEliminarId(prod.id)}
-                          className="p-1.5 bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
+                          onClick={() => iniciarEliminarProducto(prod)}
+                          disabled={cargandoImpactoId === prod.id}
+                          className="p-1.5 bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5 disabled:opacity-50"
                           title="Eliminar producto"
                           aria-label={`Eliminar ${prod.nombre}`}
                         >
@@ -265,6 +326,13 @@ const Inventario = () => {
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <button
+                      onClick={() => setProductoPerdida(prod)}
+                      className="p-2 bg-slate-800 text-amber-400 hover:text-amber-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
+                      aria-label={`Registrar pérdida de ${prod.nombre}`}
+                    >
+                      <PackageX size={16} />
+                    </button>
+                    <button
                       onClick={() => { setProductoEditando(prod); setModalProductoAbierto(true); }}
                       className="p-2 bg-slate-800 text-blue-400 hover:text-blue-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
                       aria-label={`Editar ${prod.nombre}`}
@@ -272,8 +340,9 @@ const Inventario = () => {
                       <Edit2 size={16} />
                     </button>
                     <button
-                      onClick={() => setPendienteEliminarId(prod.id)}
-                      className="p-2 bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
+                      onClick={() => iniciarEliminarProducto(prod)}
+                      disabled={cargandoImpactoId === prod.id}
+                      className="p-2 bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5 disabled:opacity-50"
                       aria-label={`Eliminar ${prod.nombre}`}
                     >
                       <Trash2 size={16} />
@@ -307,14 +376,36 @@ const Inventario = () => {
         productoEditar={productoEditando}
       />
 
+      <ModalPerdida
+        isOpen={!!productoPerdida}
+        onClose={() => setProductoPerdida(null)}
+        onSuccess={cargarDatos}
+        producto={productoPerdida}
+      />
+
+      <ModalHistorialPerdidas
+        isOpen={modalHistorialPerdidasAbierto}
+        onClose={() => setModalHistorialPerdidasAbierto(false)}
+        onCambio={cargarDatos}
+      />
+
       <ModalConfirmacion
-        isOpen={!!pendienteEliminarId}
+        isOpen={!!pendienteEliminarSimple}
         titulo="Eliminar producto"
         mensaje="¿Seguro que deseas eliminar este producto? Esta acción no se puede deshacer."
         textoConfirmar="Eliminar"
         peligroso
-        onConfirmar={confirmarEliminarProducto}
-        onCancelar={() => setPendienteEliminarId(null)}
+        onConfirmar={confirmarEliminarSimple}
+        onCancelar={() => setPendienteEliminarSimple(null)}
+      />
+
+      <ModalImpactoProducto
+        isOpen={!!productoArchivando}
+        modo="eliminar"
+        impacto={impactoArchivar}
+        cargando={procesandoEliminar}
+        onConfirmar={confirmarArchivar}
+        onCancelar={() => { setProductoArchivando(null); setImpactoArchivar(null); }}
       />
     </div>
   );

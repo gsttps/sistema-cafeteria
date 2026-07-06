@@ -131,7 +131,7 @@ class TestProductos:
         )
         assert resp.status_code == 422
 
-    def test_eliminar_producto_con_transacciones_da_409(self, client, auth_headers):
+    def test_eliminar_producto_con_transacciones_lo_archiva(self, client, auth_headers):
         # Crear producto
         prod = client.post(
             "/api/v1/productos/",
@@ -149,9 +149,19 @@ class TestProductos:
             json={"producto_id": prod_id, "cantidad": 1},
         )
 
-        # Intentar eliminar el producto — debería dar 409 (RESTRICT FK)
+        # Un producto en uso se archiva (soft-delete), no se bloquea ni se borra
         resp = client.delete(f"/api/v1/productos/{prod_id}")
-        assert resp.status_code == 409
+        assert resp.status_code == 200
+        assert resp.json()["resultado"] == "archivado"
+
+        # Desaparece del listado normal
+        nombres = [p["nombre"] for p in client.get("/api/v1/productos/").json()]
+        assert "Producto Con Transaccion" not in nombres
+
+        # El historial del cliente conserva el nombre del producto
+        historial = client.get(f"/api/v1/cuentas/cliente/{cliente['id']}/historial").json()
+        nombres_historial = [t["producto_nombre"] for c in historial for t in c["transacciones"]]
+        assert "Producto Con Transaccion" in nombres_historial
 
 
 class TestLogicaCuentas:

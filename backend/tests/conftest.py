@@ -6,6 +6,9 @@ os.environ.setdefault("SECRET_KEY", "test_secret_key_for_pytest_only_not_for_pro
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 os.environ.setdefault("BACKEND_PUBLIC_URL", "http://localhost:8000")
 os.environ.setdefault("ADMIN_INITIAL_PASSWORD", "testpassword123")
+# El TestClient usa http://, y una cookie con flag "secure" nunca se reenvía
+# sobre http, por lo que todos los requests autenticados darían 401
+os.environ.setdefault("SECURE_COOKIE", "false")
 
 # Monkey-patch: reemplaza el tipo UUID de PostgreSQL por uno compatible con SQLite
 # (debe hacerse ANTES de importar los modelos)

@@ -1,0 +1,11 @@
+# Contexto de build del backend (backend/Dockerfile usa la raíz como contexto)
+.git
+backend/venv
+backend/__pycache__
+**/__pycache__
+backend/tests
+frontend
+node_modules
+*.md
+.env
+.env.*
