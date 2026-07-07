@@ -101,7 +101,7 @@ function App() {
   return (
     <Router>
       <div className="app-container font-sans min-h-screen flex flex-col bg-animated-mesh text-slate-100">
-        <header className="px-4 sm:px-8 py-4 sm:py-5 bg-[#0b1120]/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between sticky top-0 z-header shadow-sm">
+        <header className="px-4 sm:px-8 py-4 sm:py-5 bg-[#0b1120]/60 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/[0.06] flex items-center justify-between sticky top-0 z-header shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
           <span className="font-extrabold text-lg sm:text-xl bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent tracking-tight">☕ Sistema Cafetería</span>
 
           {/* Desktop nav */}
