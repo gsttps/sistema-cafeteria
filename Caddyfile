@@ -1,6 +1,6 @@
-# Reemplaza "tu-dominio.com" con tu dominio real antes de desplegar.
-# Caddy obtiene y renueva el certificado TLS automáticamente via Let's Encrypt.
+# Dominio propio (name.com), registro A -> 82.39.109.247.
+# Caddy obtiene y renueva el certificado TLS automáticamente vía Let's Encrypt.
 
-tu-dominio.com {
+test.gsteppes.dev {
     reverse_proxy frontend:80
 }

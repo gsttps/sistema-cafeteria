@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
                 configuracion.ADMIN_INITIAL_PASSWORD or secrets.token_urlsafe(16)
             )
             usuario_admin = Usuario(
-                username="admin",
+                username=configuracion.ADMIN_INITIAL_USERNAME,
                 password_hash=obtener_hash_contrasena(password_inicial),
                 rol="admin",
             )
@@ -76,7 +76,8 @@ async def lifespan(app: FastAPI):
             db.commit()
             if configuracion.ADMIN_INITIAL_PASSWORD:
                 logger.info(
-                    "Usuario admin inicial creado con la contraseña configurada en ADMIN_INITIAL_PASSWORD."
+                    "Usuario admin inicial '%s' creado con la contraseña configurada en ADMIN_INITIAL_PASSWORD.",
+                    configuracion.ADMIN_INITIAL_USERNAME,
                 )
             else:
                 logger.warning(

@@ -38,7 +38,8 @@ class Configuracion(BaseSettings):
     # Producción: "https://tu-dominio.com" (mismo dominio, proxiado)
     BACKEND_PUBLIC_URL: str = "http://localhost:8000"
 
-    # Contraseña inicial del usuario admin (si no se define, se genera una aleatoria al primer arranque)
+    # Usuario y contraseña inicial del admin (si la contraseña no se define, se genera una aleatoria al primer arranque)
+    ADMIN_INITIAL_USERNAME: str = "admin"
     ADMIN_INITIAL_PASSWORD: str = ""
 
     # Base de Datos
