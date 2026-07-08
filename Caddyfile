@@ -2,5 +2,10 @@
 # Caddy obtiene y renueva el certificado TLS automáticamente vía Let's Encrypt.
 
 test.gsteppes.dev {
+    # Sintaxis de bloque: el ";" dentro del valor rompe la directiva "header"
+    # de una sola línea (Caddyfile la descarta en silencio), el bloque sí lo soporta.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
     reverse_proxy frontend:80
 }

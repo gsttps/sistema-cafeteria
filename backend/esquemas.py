@@ -200,11 +200,20 @@ class PerdidaRespuesta(BaseModel):
 class TransaccionCrear(BaseModel):
     producto_id: UUID
     cantidad: int = Field(1, ge=1)
+    # Período/fecha opcionales: permiten agregar el consumo a un mes anterior
+    # y/o a un día específico. Si se omiten, se usa el mes/día actual.
+    mes: Optional[int] = Field(None, ge=1, le=12)
+    anio: Optional[int] = Field(None, ge=2000, le=2100)
+    dia: Optional[int] = Field(None, ge=1, le=31)
 
 class PedidoPersonalizadoCrear(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
     precio: Decimal = Field(..., gt=0)
     cantidad: int = Field(1, ge=1)
+    # Ver TransaccionCrear: período/fecha opcionales para meses anteriores y día específico.
+    mes: Optional[int] = Field(None, ge=1, le=12)
+    anio: Optional[int] = Field(None, ge=2000, le=2100)
+    dia: Optional[int] = Field(None, ge=1, le=31)
 
     @field_validator('nombre')
     @classmethod

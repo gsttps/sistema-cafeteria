@@ -58,6 +58,8 @@ function PanelAtencion() {
   const [precioPedido, setPrecioPedido] = useState('');
   const [cantidadPedido, setCantidadPedido] = useState(1);
   const [enviandoPedido, setEnviandoPedido] = useState(false);
+  // Día elegido para las transacciones nuevas; null = "todo el mes" (día actual ajustado)
+  const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
 
   // --- GENERAL ACTIONS ---
   
@@ -118,6 +120,7 @@ function PanelAtencion() {
   // Al seleccionar un cliente, cargar su cuenta actual
   const seleccionarCliente = async (cliente: Cliente) => {
     setClienteSeleccionado(cliente);
+    setDiaSeleccionado(null);
     setCargandoCuenta(true);
     try {
       const respCuenta = await servicioCuenta.obtenerPorCliente(cliente.id);
@@ -155,7 +158,10 @@ function PanelAtencion() {
     try {
       await servicioCuenta.agregarTransaccion(clienteSeleccionado.id, {
         producto_id: productoId,
-        cantidad: 1
+        cantidad: 1,
+        mes: cuentaSeleccionada.mes,
+        anio: cuentaSeleccionada.anio,
+        dia: diaSeleccionado ?? undefined,
       });
       await refrescarDatosCuenta();
     } catch (err) {
@@ -202,6 +208,9 @@ function PanelAtencion() {
         nombre: nombrePedido.trim(),
         precio,
         cantidad: cantidadPedido,
+        mes: cuentaSeleccionada.mes,
+        anio: cuentaSeleccionada.anio,
+        dia: diaSeleccionado ?? undefined,
       });
       setMostrarModalPedido(false);
       setNombrePedido('');
@@ -517,8 +526,12 @@ function PanelAtencion() {
               <SelectorMes
                 mes={cuentaSeleccionada?.mes || new Date().getMonth() + 1}
                 anio={cuentaSeleccionada?.anio || new Date().getFullYear()}
+                dia={diaSeleccionado}
+                onChangeDia={setDiaSeleccionado}
                 onChange={async (mes: number, anio: number) => {
                   setCargandoCuenta(true);
+                  // Al cambiar de período reseteamos el día para no arrastrar uno inválido a otro mes
+                  setDiaSeleccionado(null);
                   try {
                     const resp = await servicioCuenta.obtenerPorCliente(clienteSeleccionado.id, mes, anio);
                     setCuentaSeleccionada(resp.data);

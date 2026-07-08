@@ -70,7 +70,7 @@ export const servicioPerdida = {
 export const servicioCuenta = {
   obtenerPorCliente: (clienteId: string, mes?: number, anio?: number) =>
     api.get<CuentaMensual>(`/cuentas/cliente/${clienteId}`, { params: { mes, anio } }),
-  agregarTransaccion: (clienteId: string, datos: { producto_id: string; cantidad: number }) =>
+  agregarTransaccion: (clienteId: string, datos: { producto_id: string; cantidad: number; mes?: number; anio?: number; dia?: number }) =>
     api.post<Transaccion>(`/cuentas/cliente/${clienteId}/agregar_item`, datos),
   obtenerHistorial: (clienteId: string) => api.get<CuentaMensual[]>(`/cuentas/cliente/${clienteId}/historial`),
   actualizarDescuento: (cuentaId: string, porcentaje: number) =>
@@ -78,7 +78,7 @@ export const servicioCuenta = {
   cerrar: (cuentaId: string, monto_pagado?: number) => 
     api.put<CuentaMensual>(`/cuentas/${cuentaId}/cerrar`, { monto_pagado }),
   eliminarTransaccion: (transaccionId: string) => api.delete(`/cuentas/transaccion/${transaccionId}`),
-  pedidoPersonalizado: (clienteId: string, datos: { nombre: string; precio: number; cantidad: number }) =>
+  pedidoPersonalizado: (clienteId: string, datos: { nombre: string; precio: number; cantidad: number; mes?: number; anio?: number; dia?: number }) =>
     api.post<Transaccion>(`/cuentas/cliente/${clienteId}/pedido_personalizado`, datos),
 };
 

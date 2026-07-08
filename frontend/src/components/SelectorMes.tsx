@@ -6,6 +6,8 @@ interface SelectorMesProps {
   mes: number; // 1-12
   anio: number;
   onChange: (mes: number, anio: number) => void;
+  dia?: number | null; // día específico para las transacciones nuevas; null = "todo el mes"
+  onChangeDia?: (dia: number | null) => void;
 }
 
 const NOMBRES_MESES_COMPLETOS = [
@@ -18,7 +20,7 @@ const NOMBRES_MESES_ABREV = [
   'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
 ];
 
-function SelectorMes({ mes, anio, onChange }: SelectorMesProps) {
+function SelectorMes({ mes, anio, onChange, dia = null, onChangeDia }: SelectorMesProps) {
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [anioTemp, setAnioTemp] = useState(anio);
   const containerRef = useClickAfuera<HTMLDivElement>(useCallback(() => setMostrarPopup(false), []));
@@ -30,8 +32,11 @@ function SelectorMes({ mes, anio, onChange }: SelectorMesProps) {
 
   const seleccionarMes = (mesIdx: number) => {
     onChange(mesIdx + 1, anioTemp);
-    setMostrarPopup(false);
+    // El popup permanece abierto para poder elegir el día del nuevo mes
   };
+
+  // Cantidad de días del mes actualmente visible (mes/anio de la cuenta seleccionada)
+  const diasEnMes = new Date(anio, mes, 0).getDate();
 
   return (
     <div className="relative w-full" ref={containerRef}>
@@ -44,7 +49,10 @@ function SelectorMes({ mes, anio, onChange }: SelectorMesProps) {
       >
         <div className="flex items-center gap-2">
           <Calendar size={16} />
-          <span>{NOMBRES_MESES_COMPLETOS[mes - 1]} {anio}</span>
+          <span>
+            {NOMBRES_MESES_COMPLETOS[mes - 1]} {anio}
+            {dia != null && <span className="text-blue-300"> · día {dia}</span>}
+          </span>
         </div>
         <ChevronDown size={16} className="text-blue-300" />
       </button>
@@ -101,6 +109,45 @@ function SelectorMes({ mes, anio, onChange }: SelectorMesProps) {
               );
             })}
           </div>
+
+          {/* Selección de día (opcional) para las transacciones nuevas */}
+          {onChangeDia && (
+            <div className="mt-4 pt-4 border-t border-slate-700">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Día</span>
+                <button
+                  type="button"
+                  onClick={() => onChangeDia(null)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer border ${
+                    dia == null
+                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
+                      : 'bg-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200 border-white/10'
+                  }`}
+                >
+                  Todo el mes
+                </button>
+              </div>
+              <div className="grid grid-cols-7 gap-1.5">
+                {Array.from({ length: diasEnMes }, (_, i) => i + 1).map((d) => {
+                  const esSeleccionado = dia === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => onChangeDia(d)}
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer border ${
+                        esSeleccionado
+                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_12px_rgba(59,130,246,0.2)] scale-105'
+                          : 'bg-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200 border-transparent hover:border-white/10'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

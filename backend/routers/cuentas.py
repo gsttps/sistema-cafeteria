@@ -1,4 +1,5 @@
 import datetime
+import calendar
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
@@ -10,6 +11,20 @@ from backend.modelos import CuentaMensual, Transaccion, Producto, Cliente, Usuar
 from backend.esquemas import TransaccionCrear, PedidoPersonalizadoCrear, CuentaMensualRespuesta, TransaccionRespuesta, PagoCuentaRequest
 
 router = APIRouter(prefix="/cuentas", tags=["Cuentas Mensuales"])
+
+def resolver_periodo_y_fecha(mes: Optional[int], anio: Optional[int], dia: Optional[int]):
+    """Devuelve (mes, anio, fecha_hora) para una transacción a partir de la
+    selección del usuario. Si falta mes/anio usa el actual. Construye fecha_hora
+    con timezone UTC al mediodía para evitar corrimientos de día por zona horaria."""
+    ahora = datetime.datetime.now(datetime.timezone.utc)
+    mes = mes or ahora.month
+    anio = anio or ahora.year
+    ultimo_dia = calendar.monthrange(anio, mes)[1]
+    # "solo mes" => día actual ajustado (clamp al último día válido del mes)
+    dia_final = min(dia or ahora.day, ultimo_dia)
+    fecha_hora = ahora.replace(year=anio, month=mes, day=dia_final,
+                               hour=12, minute=0, second=0, microsecond=0)
+    return mes, anio, fecha_hora
 
 def ayudante_calcular_cuenta(cuenta: CuentaMensual, db: Optional[Session] = None) -> dict:
     """Función de ayuda para calcular totales de la cuenta en tiempo real y enriquecer nombres de productos."""
@@ -140,10 +155,8 @@ def agregar_transaccion(
     if producto.estado == "archivado":
         raise HTTPException(status_code=409, detail="El producto está archivado y no se puede vender")
 
-    # Obtener mes y año local actual
-    ahora = datetime.datetime.now()
-    mes = ahora.month
-    anio = ahora.year
+    # Resolver período y fecha según la selección del usuario (mes anterior / día específico)
+    mes, anio, fecha_hora = resolver_periodo_y_fecha(item_in.mes, item_in.anio, item_in.dia)
 
     # Obtener o crear cuenta abierta para este mes
     cuenta = db.query(CuentaMensual).filter(
@@ -164,13 +177,14 @@ def agregar_transaccion(
         db.add(cuenta)
         db.commit()
         db.refresh(cuenta)
-        
+
     # CRITICO: Congelar precio histórico
     db_transaccion = Transaccion(
         cuenta_mensual_id=cuenta.id,
         producto_id=producto.id,
         cantidad=item_in.cantidad,
-        precio_historico=producto.precio_actual
+        precio_historico=producto.precio_actual,
+        fecha_hora=fecha_hora
     )
     db.add(db_transaccion)
     db.commit()
@@ -207,10 +221,8 @@ def agregar_pedido_personalizado(
         if producto.estado == "archivado":
             producto.estado = "activo"
 
-    # Obtener mes y año local actual
-    ahora = datetime.datetime.now()
-    mes = ahora.month
-    anio = ahora.year
+    # Resolver período y fecha según la selección del usuario (mes anterior / día específico)
+    mes, anio, fecha_hora = resolver_periodo_y_fecha(pedido.mes, pedido.anio, pedido.dia)
 
     # Obtener o crear cuenta abierta para este mes
     cuenta = db.query(CuentaMensual).filter(
@@ -236,7 +248,8 @@ def agregar_pedido_personalizado(
         cuenta_mensual_id=cuenta.id,
         producto_id=producto.id,
         cantidad=pedido.cantidad,
-        precio_historico=pedido.precio
+        precio_historico=pedido.precio,
+        fecha_hora=fecha_hora
     )
     db.add(db_transaccion)
     db.commit()

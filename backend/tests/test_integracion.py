@@ -65,6 +65,42 @@ class TestBalancesValidacion:
         assert "total_pendiente" in body
 
 
+class TestCuentasValidacionAnio:
+    def _crear_cliente_y_producto(self, client):
+        cliente = client.post(
+            "/api/v1/clientes/", json={"nombre": "Cliente Anio Test"}
+        ).json()
+        producto = client.post(
+            "/api/v1/productos/",
+            json={"nombre": "Producto Anio Test", "precio_actual": "100", "stock_actual": 10},
+        ).json()
+        return cliente, producto
+
+    def test_agregar_item_anio_negativo_retorna_422(self, client, auth_headers):
+        cliente, producto = self._crear_cliente_y_producto(client)
+        resp = client.post(
+            f"/api/v1/cuentas/cliente/{cliente['id']}/agregar_item",
+            json={"producto_id": producto["id"], "cantidad": 1, "anio": -5},
+        )
+        assert resp.status_code == 422
+
+    def test_agregar_item_anio_extremo_retorna_422(self, client, auth_headers):
+        cliente, producto = self._crear_cliente_y_producto(client)
+        resp = client.post(
+            f"/api/v1/cuentas/cliente/{cliente['id']}/agregar_item",
+            json={"producto_id": producto["id"], "cantidad": 1, "anio": 100000},
+        )
+        assert resp.status_code == 422
+
+    def test_agregar_item_anio_valido_es_aceptado(self, client, auth_headers):
+        cliente, producto = self._crear_cliente_y_producto(client)
+        resp = client.post(
+            f"/api/v1/cuentas/cliente/{cliente['id']}/agregar_item",
+            json={"producto_id": producto["id"], "cantidad": 1, "mes": 6, "anio": 2024},
+        )
+        assert resp.status_code == 200
+
+
 class TestClientes:
     def test_crear_cliente(self, client, auth_headers):
         resp = client.post(
