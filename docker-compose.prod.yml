@@ -2,6 +2,18 @@ services:
   db:
     image: postgres:15-alpine
     restart: unless-stopped
+    # Afinado para un VPS de ~1GB de RAM total: sin esto, Postgres asume mucha
+    # más memoria disponible de la que hay y compite con el resto de los
+    # contenedores. max_connections=30 alcanza justo con el pool del backend
+    # (pool_size=10 + max_overflow=20, un solo worker).
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c max_connections=30
+      -c effective_cache_size=192MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+    mem_limit: 300m
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,6 +33,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    mem_limit: 250m
     env_file: .env.prod
     environment:
       POSTGRES_HOST: db
@@ -41,6 +54,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
+    mem_limit: 48m
     depends_on:
       - backend
     networks:
@@ -50,6 +64,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    mem_limit: 96m
     ports:
       - "80:80"
       - "443:443"
