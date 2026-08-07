@@ -27,6 +27,11 @@ env/
 .ruff_cache/
 .mypy_cache/
 
+# Logo subido en runtime por el Panel Admin (backend/main.py: LOGO_DIR).
+# Este directorio coincide con el de origen; nunca debe versionarse su contenido.
+backend/static/*
+!backend/static/.gitkeep
+
 
 # =========================
 # IGNORAR PARA FRONTEND (REACT/NODE)
