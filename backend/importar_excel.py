@@ -7,7 +7,7 @@ y se cierran con una fila-etiqueta (Producto = nombre del mes, Total = total).
 El segmento final suele quedar sin etiquetar (mes en curso).
 
 El script crea todos los clientes y luego importa los consumos de los meses
-objetivo (abril-junio 2026) replicando la semántica del endpoint
+objetivo (abril-julio 2026) replicando la semántica del endpoint
 `pedido_personalizado`: get-or-create de Producto por nombre y Transaccion con
 precio_historico congelado. Cada mes queda como CuentaMensual "abierta".
 
@@ -30,8 +30,8 @@ from backend.base_datos import SesionLocal
 from backend.modelos import Cliente, CuentaMensual, Producto, Transaccion
 
 ANIO_OBJETIVO = 2026
-MESES_OBJETIVO = (4, 5, 6)
-NOMBRE_MES = {4: "abril", 5: "mayo", 6: "junio"}
+MESES_OBJETIVO = (4, 5, 6, 7)
+NOMBRE_MES = {4: "abril", 5: "mayo", 6: "junio", 7: "julio"}
 # Hojas sin formato itemizado: solo se crea el cliente (carga manual posterior)
 HOJAS_SOLO_CLIENTE = {"DANIL", "FRANCISCA"}
 

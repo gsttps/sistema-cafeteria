@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, PackageX, Trash2 } from 'lucide-react';
+import { PackageX, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PerdidaInventario } from '../../types';
 import { servicioPerdida } from '../../services/api';
-import { formatoDinero } from '../../utils/formato';
-import { useTeclaEscape } from '../../hooks/useTeclaEscape';
+import Modal from '../../components/ui/Modal';
+import Monto from '../../components/ui/Monto';
 import ModalConfirmacion from '../../components/ModalConfirmacion';
 
 interface ModalHistorialPerdidasProps {
@@ -25,6 +25,7 @@ const ModalHistorialPerdidas = ({ isOpen, onClose, onCambio }: ModalHistorialPer
       setPerdidas(resp.data);
     } catch (err) {
       console.error('Error al cargar pérdidas:', err);
+      toast.error('No se pudo cargar el historial de pérdidas.');
     } finally {
       setCargando(false);
     }
@@ -51,98 +52,76 @@ const ModalHistorialPerdidas = ({ isOpen, onClose, onCambio }: ModalHistorialPer
 
   const totalPerdido = perdidas.reduce((acc, p) => acc + p.cantidad * Number(p.costo_historico), 0);
 
-  useTeclaEscape(isOpen, onClose);
-
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Historial de pérdidas">
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-
-      <div className="bg-[#0b1120] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden relative z-10 anim-slide-in flex flex-col max-h-[85vh]">
-        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <PackageX size={20} className="text-amber-400" />
-            Historial de Pérdidas
-          </h2>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-auto flex-1">
+    <>
+      <Modal abierto={isOpen} onCerrar={onClose} titulo="Historial de pérdidas" ancho="lg">
+        <div className="max-h-[60vh] overflow-y-auto">
           {cargando ? (
-            <p className="p-8 text-center text-slate-500">Cargando...</p>
+            <p className="py-8 text-center text-sm text-tinta-tenue">Cargando…</p>
           ) : perdidas.length === 0 ? (
-            <div className="p-12 text-center text-slate-500">
-              <PackageX className="mx-auto mb-3 opacity-20" size={48} />
-              No hay pérdidas registradas
+            <div className="py-12 text-center text-tinta-tenue">
+              <PackageX className="mx-auto mb-3 opacity-30" size={36} />
+              No hay pérdidas registradas.
             </div>
           ) : (
-            <div className="space-y-3">
+            <ul className="list-none space-y-2 p-0">
               {perdidas.map((p) => (
-                <div key={p.id} className="bg-slate-900/40 border border-white/5 rounded-xl p-4 flex justify-between items-start gap-3">
+                <li
+                  key={p.id}
+                  className="flex items-start justify-between gap-3 rounded border border-borde px-3 py-2.5"
+                >
                   <div className="min-w-0">
-                    <p className="text-slate-100 font-semibold">
-                      {p.cantidad} x {p.producto_nombre || 'Producto eliminado'}
+                    <p className="text-sm text-tinta">
+                      {p.cantidad} × {p.producto_nombre || 'Producto eliminado'}
                     </p>
-                    <p className="text-slate-400 text-sm mt-1">
-                      {p.motivo || <span className="italic text-slate-500">Sin motivo registrado</span>}
+                    <p className="mt-0.5 text-xs text-tinta-suave">
+                      {p.motivo || <span className="italic text-tinta-tenue">Sin motivo registrado</span>}
                     </p>
-                    <p className="text-slate-500 text-xs mt-1.5">
+                    <p className="mt-1 text-xs text-tinta-tenue">
                       {new Date(p.fecha_hora).toLocaleDateString('es-CL', {
                         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
                       })}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-amber-400 font-semibold text-sm">
-                      -{formatoDinero(p.cantidad * Number(p.costo_historico))}
-                    </span>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Monto valor={-(p.cantidad * Number(p.costo_historico))} tono="deuda" />
                     <button
                       onClick={() => setPendienteEliminarId(p.id)}
-                      className="p-1.5 bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors border border-white/5"
+                      className="rounded p-1 text-tinta-tenue transition-colors duration-rapida hover:bg-deuda-suave hover:text-deuda"
                       title="Eliminar registro (repone el stock)"
                       aria-label="Eliminar registro de pérdida"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
 
         {perdidas.length > 0 && (
-          <div className="p-6 border-t border-white/5 bg-slate-900/30 flex justify-between items-center">
-            <span className="text-slate-400 text-sm font-semibold">
+          <div className="mt-4 flex items-center justify-between border-t border-borde pt-3 text-sm">
+            <span className="text-tinta-tenue">
               {perdidas.length} {perdidas.length === 1 ? 'registro' : 'registros'}
             </span>
-            <span className="text-slate-200 font-bold">
-              Total perdido: <span className="text-amber-400">{formatoDinero(totalPerdido)}</span>
+            <span className="text-tinta-suave">
+              Total perdido <Monto valor={totalPerdido} tono="deuda" />
             </span>
           </div>
         )}
-      </div>
+      </Modal>
 
       <ModalConfirmacion
         isOpen={!!pendienteEliminarId}
         titulo="Eliminar registro de pérdida"
-        mensaje="Se eliminará el registro y la cantidad perdida se repondrá al stock del producto. ¿Continuar?"
+        mensaje="Se elimina el registro y la cantidad perdida se repone al stock del producto. ¿Continuar?"
         textoConfirmar="Eliminar"
         peligroso
         onConfirmar={confirmarEliminar}
         onCancelar={() => setPendienteEliminarId(null)}
       />
-    </div>
+    </>
   );
 };
 

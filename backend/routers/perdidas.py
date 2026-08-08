@@ -6,6 +6,7 @@ from uuid import UUID
 from backend.base_datos import obtener_db, obtener_usuario_actual, verificar_rol_admin
 from backend.modelos import PerdidaInventario, Producto, Usuario
 from backend.esquemas import PerdidaCrear, PerdidaRespuesta
+from backend.zona_horaria import ahora_negocio, fecha_hora_negocio
 
 router = APIRouter(prefix="/perdidas", tags=["Pérdidas de Inventario"])
 
@@ -43,11 +44,17 @@ def registrar_perdida(
     if producto.estado == "archivado":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El producto está archivado")
 
+    # Ancla la fecha al mediodía UTC del día de negocio (Chile), igual que las
+    # transacciones: sin esto, una merma cargada entre las 20:00 y medianoche
+    # hora Chile quedaba fechada (y por lo tanto reportada en Balances) en el
+    # día/mes siguiente, porque el servidor corre en UTC.
+    ahora = ahora_negocio()
     db_perdida = PerdidaInventario(
         producto_id=producto.id,
         cantidad=perdida_in.cantidad,
         motivo=perdida_in.motivo,
         costo_historico=producto.precio_actual,
+        fecha_hora=fecha_hora_negocio(ahora.year, ahora.month, ahora.day),
     )
     # El stock nunca queda negativo: se puede registrar la pérdida de algo
     # que no estaba contabilizado en el stock

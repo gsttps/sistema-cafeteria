@@ -61,8 +61,8 @@ class TestBalancesValidacion:
         resp = client.get("/api/v1/balances/?mes=6&anio=2024")
         assert resp.status_code == 200
         body = resp.json()
-        assert "total_pagado" in body
-        assert "total_pendiente" in body
+        assert body["resumen"]["cobrado"]["actual"] == 0
+        assert body["resumen"]["por_cobrar"]["actual"] == 0
 
 
 class TestCuentasValidacionAnio:
@@ -292,3 +292,64 @@ class TestLogicaCuentas:
         cuenta_sig = resp_sig.json()
         # La cuenta del mes siguiente debe tener una deuda de 3000
         assert Decimal(cuenta_sig["total_original"]) == Decimal("3000.00")
+
+
+class TestCierreConDescuento:
+    """El cierre lleva el descuento en el mismo request, para que el total
+    cobrado sea siempre el que vio el cajero aunque el guardado aparte no llegue."""
+
+    def _cuenta_con_consumo(self, client, nombre, precio, cantidad=1):
+        prod = client.post(
+            "/api/v1/productos/",
+            json={"nombre": f"Producto {nombre}", "precio_actual": precio},
+        ).json()
+        cliente = client.post("/api/v1/clientes/", json={"nombre": nombre}).json()
+        client.post(
+            f"/api/v1/cuentas/cliente/{cliente['id']}/agregar_item",
+            json={"producto_id": prod["id"], "cantidad": cantidad},
+        )
+        return cliente, client.get(f"/api/v1/cuentas/cliente/{cliente['id']}").json()
+
+    def test_descuento_enviado_al_cerrar_se_aplica(self, client, auth_headers):
+        """10.000 con 50% enviado en el cierre => se cobra 5.000 y no queda deuda."""
+        cliente, cuenta = self._cuenta_con_consumo(client, "Cierre Descuento", "10000")
+
+        resp = client.put(
+            f"/api/v1/cuentas/{cuenta['id']}/cerrar",
+            json={"monto_pagado": "5000", "porcentaje_descuento": "50"},
+        )
+        assert resp.status_code == 200
+        assert Decimal(resp.json()["total_con_descuento"]) == Decimal("5000.00")
+
+        # Sin deuda residual: no se traspasó nada al mes siguiente
+        next_mes = cuenta["mes"] + 1 if cuenta["mes"] < 12 else 1
+        next_anio = cuenta["anio"] if cuenta["mes"] < 12 else cuenta["anio"] + 1
+        sig = client.get(
+            f"/api/v1/cuentas/cliente/{cliente['id']}?mes={next_mes}&anio={next_anio}"
+        ).json()
+        assert Decimal(sig["total_original"]) == Decimal("0.00")
+
+    def test_cerrar_sin_descuento_no_pisa_el_guardado(self, client, auth_headers):
+        """Un body sin el campo debe respetar el descuento ya persistido."""
+        _, cuenta = self._cuenta_con_consumo(client, "Cierre Sin Campo", "10000")
+        client.put(f"/api/v1/cuentas/{cuenta['id']}/descuento?porcentaje_descuento=10")
+
+        resp = client.put(f"/api/v1/cuentas/{cuenta['id']}/cerrar", json={})
+        assert resp.status_code == 200
+        assert Decimal(resp.json()["total_con_descuento"]) == Decimal("9000.00")
+
+    def test_cerrar_pagando_cero_traspasa_todo(self, client, auth_headers):
+        """Cerrar el mes sin cobrar nada arrastra la deuda completa."""
+        cliente, cuenta = self._cuenta_con_consumo(client, "Cierre Cero", "4000")
+
+        resp = client.put(
+            f"/api/v1/cuentas/{cuenta['id']}/cerrar", json={"monto_pagado": 0}
+        )
+        assert resp.status_code == 200
+
+        next_mes = cuenta["mes"] + 1 if cuenta["mes"] < 12 else 1
+        next_anio = cuenta["anio"] if cuenta["mes"] < 12 else cuenta["anio"] + 1
+        sig = client.get(
+            f"/api/v1/cuentas/cliente/{cliente['id']}?mes={next_mes}&anio={next_anio}"
+        ).json()
+        assert Decimal(sig["total_original"]) == Decimal("4000.00")

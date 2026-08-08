@@ -38,6 +38,11 @@ function SelectorMes({ mes, anio, onChange, dia = null, onChangeDia }: SelectorM
   // Cantidad de días del mes actualmente visible (mes/anio de la cuenta seleccionada)
   const diasEnMes = new Date(anio, mes, 0).getDate();
 
+  // Se permite un año hacia adelante (para el arrastre de deuda de diciembre),
+  // pero no más: sin tope se podía anotar consumo en 2099 por error.
+  const ANIO_MIN = 2022;
+  const ANIO_MAX = new Date().getFullYear() + 1;
+
   return (
     <div className="relative w-full" ref={containerRef}>
       <button
@@ -45,52 +50,47 @@ function SelectorMes({ mes, anio, onChange, dia = null, onChangeDia }: SelectorM
         onClick={() => setMostrarPopup(!mostrarPopup)}
         aria-haspopup="dialog"
         aria-expanded={mostrarPopup}
-        className="w-full px-5 py-3 rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-400 font-bold text-sm flex justify-between items-center shadow-[0_0_15px_rgba(59,130,246,0.15)] hover:bg-blue-500/20 hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] transition-all duration-300"
+        className="flex w-full items-center justify-between gap-2 rounded border border-borde-fuerte bg-superficie-elevada px-3 py-2 text-sm text-tinta transition-colors duration-rapida hover:border-tinta-tenue"
       >
         <div className="flex items-center gap-2">
-          <Calendar size={16} />
+          <Calendar size={14} className="text-tinta-tenue" />
           <span>
             {NOMBRES_MESES_COMPLETOS[mes - 1]} {anio}
-            {dia != null && <span className="text-blue-300"> · día {dia}</span>}
+            {dia != null && <span className="text-acento"> · día {dia}</span>}
           </span>
         </div>
-        <ChevronDown size={16} className="text-blue-300" />
+        <ChevronDown size={14} className="shrink-0 text-tinta-tenue" />
       </button>
 
       {mostrarPopup && (
-        <div className="absolute top-full right-0 w-[300px] bg-[#0b1120]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-5 mt-3 z-dropdown shadow-[0_0_50px_rgba(0,0,0,0.7)] anim-fade-in">
+        <div className="absolute top-full right-0 w-[300px] mt-1 z-dropdown animate-aparecer rounded border border-borde-fuerte bg-superficie-alta p-4 shadow-xl shadow-black/50">
           {/* Cabecera del popup: Selección de Año */}
-          <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+          <div className="mb-3 flex items-center justify-between border-b border-borde pb-2">
             <button
               type="button"
-              onClick={() => setAnioTemp(prev => Math.max(2022, prev - 1))}
-              disabled={anioTemp <= 2022}
+              onClick={() => setAnioTemp(prev => Math.max(ANIO_MIN, prev - 1))}
+              disabled={anioTemp <= ANIO_MIN}
               aria-label="Año anterior"
-              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 border ${
-                anioTemp <= 2022 
-                  ? 'bg-transparent text-slate-600 border-transparent cursor-not-allowed' 
-                  : 'bg-white/5 hover:bg-white/10 border-white/5 text-slate-300 cursor-pointer shadow-inner'
-              }`}
+              className="rounded p-1 text-tinta-suave transition-colors duration-rapida hover:bg-superficie-sutil hover:text-tinta disabled:opacity-30 disabled:hover:bg-transparent"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={16} />
             </button>
-            
-            <span className="text-lg font-bold text-slate-100 select-none tracking-tight">
-              {anioTemp}
-            </span>
+
+            <span className="cifra select-none text-sm font-medium text-tinta">{anioTemp}</span>
 
             <button
               type="button"
-              onClick={() => setAnioTemp(prev => prev + 1)}
+              onClick={() => setAnioTemp(prev => Math.min(ANIO_MAX, prev + 1))}
+              disabled={anioTemp >= ANIO_MAX}
               aria-label="Año siguiente"
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 cursor-pointer transition-all duration-300 shadow-inner"
+              className="rounded p-1 text-tinta-suave transition-colors duration-rapida hover:bg-superficie-sutil hover:text-tinta disabled:opacity-30 disabled:hover:bg-transparent"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={16} />
             </button>
           </div>
 
           {/* Grilla 3x4 de meses */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-1">
             {NOMBRES_MESES_ABREV.map((m, idx) => {
               const esSeleccionado = (idx + 1 === mes) && (anioTemp === anio);
               return (
@@ -98,10 +98,10 @@ function SelectorMes({ mes, anio, onChange, dia = null, onChangeDia }: SelectorM
                   key={m}
                   type="button"
                   onClick={() => seleccionarMes(idx)}
-                  className={`py-3 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer border ${
-                    esSeleccionado 
-                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-105' 
-                      : 'bg-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200 border-transparent hover:border-white/10 hover:scale-105'
+                  className={`rounded-sm py-1.5 text-sm transition-colors duration-rapida ${
+                    esSeleccionado
+                      ? 'bg-acento-suave text-acento'
+                      : 'text-tinta-suave hover:bg-superficie-sutil hover:text-tinta'
                   }`}
                 >
                   {m}
@@ -112,22 +112,24 @@ function SelectorMes({ mes, anio, onChange, dia = null, onChangeDia }: SelectorM
 
           {/* Selección de día (opcional) para las transacciones nuevas */}
           {onChangeDia && (
-            <div className="mt-4 pt-4 border-t border-slate-700">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Día</span>
+            <div className="mt-3 border-t border-borde pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-tinta-tenue">
+                  Día
+                </span>
                 <button
                   type="button"
                   onClick={() => onChangeDia(null)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer border ${
+                  className={`rounded-sm px-2 py-1 text-xs transition-colors duration-rapida ${
                     dia == null
-                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
-                      : 'bg-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200 border-white/10'
+                      ? 'bg-acento-suave text-acento'
+                      : 'text-tinta-suave hover:bg-superficie-sutil hover:text-tinta'
                   }`}
                 >
                   Todo el mes
                 </button>
               </div>
-              <div className="grid grid-cols-7 gap-1.5">
+              <div className="grid grid-cols-7 gap-1">
                 {Array.from({ length: diasEnMes }, (_, i) => i + 1).map((d) => {
                   const esSeleccionado = dia === d;
                   return (
@@ -135,10 +137,10 @@ function SelectorMes({ mes, anio, onChange, dia = null, onChangeDia }: SelectorM
                       key={d}
                       type="button"
                       onClick={() => onChangeDia(d)}
-                      className={`py-1.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer border ${
+                      className={`cifra rounded-sm py-1 text-xs transition-colors duration-rapida ${
                         esSeleccionado
-                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_12px_rgba(59,130,246,0.2)] scale-105'
-                          : 'bg-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200 border-transparent hover:border-white/10'
+                          ? 'bg-acento-suave text-acento'
+                          : 'text-tinta-suave hover:bg-superficie-sutil hover:text-tinta'
                       }`}
                     >
                       {d}

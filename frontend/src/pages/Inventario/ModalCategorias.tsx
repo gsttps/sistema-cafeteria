@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Edit2, Check, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import Boton from '../../components/ui/Boton';
+import Campo from '../../components/ui/Campo';
+import Modal from '../../components/ui/Modal';
 import ModalConfirmacion from '../../components/ModalConfirmacion';
 import { Categoria } from '../../types';
 import { servicioCategoria } from '../../services/api';
-import { useTeclaEscape } from '../../hooks/useTeclaEscape';
 
 interface ModalCategoriasProps {
   isOpen: boolean;
@@ -14,7 +16,7 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [nuevaCategoria, setNuevaCategoria] = useState('');
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editandoNombre, setEditandoNombre] = useState('');
@@ -78,110 +80,90 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
     }
   };
 
-  // Escape cierra el modal, salvo que haya una confirmación anidada abierta
-  // (en ese caso Escape lo maneja la propia ModalConfirmacion).
-  useTeclaEscape(isOpen && !pendienteEliminarId, onClose);
-
-  if (!isOpen) return null;
-
   return (
     <>
-    <ModalConfirmacion
-      isOpen={!!pendienteEliminarId}
-      titulo="Eliminar categoría"
-      mensaje="¿Seguro que deseas eliminar esta categoría? Los productos asociados quedarán sin categoría."
-      textoConfirmar="Eliminar"
-      peligroso
-      onConfirmar={confirmarEliminar}
-      onCancelar={() => setPendienteEliminarId(null)}
-    />
-    <div className="fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Gestionar categorías">
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
+      <ModalConfirmacion
+        isOpen={!!pendienteEliminarId}
+        titulo="Eliminar categoría"
+        mensaje="¿Seguro que deseas eliminar esta categoría? Los productos asociados quedarán sin categoría."
+        textoConfirmar="Eliminar"
+        peligroso
+        onConfirmar={confirmarEliminar}
+        onCancelar={() => setPendienteEliminarId(null)}
       />
 
-      <div className="bg-[#0b1120] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative z-10 anim-slide-in">
-        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
-          <h2 className="text-xl font-bold text-slate-100">Gestionar Categorías</h2>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
+      <Modal abierto={isOpen} onCerrar={onClose} titulo="Categorías" ancho="sm">
+        <div className="space-y-4">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl flex items-center gap-2 text-sm">
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
+            <p className="border-l-2 border-deuda bg-deuda-suave px-3 py-2 text-sm text-tinta">{error}</p>
           )}
 
           <div className="flex gap-2">
-            <input 
-              type="text"
-              placeholder="Nueva categoría..."
+            <Campo
+              placeholder="Nueva categoría…"
               value={nuevaCategoria}
               onChange={(e) => setNuevaCategoria(e.target.value)}
-              className="input-premium flex-1"
               onKeyDown={(e) => e.key === 'Enter' && handleCrear()}
+              contenedorClassName="flex-1"
             />
-            <button 
-              onClick={handleCrear}
-              disabled={!nuevaCategoria.trim()}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20"
-            >
-              <Plus size={18} />
-              Añadir
-            </button>
+            <Boton variante="primario" onClick={handleCrear} disabled={!nuevaCategoria.trim()}>
+              <Plus size={15} /> Añadir
+            </Boton>
           </div>
 
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+          <div className="max-h-64 space-y-1 overflow-y-auto">
             {cargando && categorias.length === 0 ? (
-              <p className="text-slate-500 text-center py-4">Cargando...</p>
+              <p className="py-4 text-center text-sm text-tinta-tenue">Cargando…</p>
             ) : categorias.length === 0 ? (
-              <p className="text-slate-500 text-center py-4 text-sm">No hay categorías. Crea una.</p>
+              <p className="py-4 text-center text-sm text-tinta-tenue">No hay categorías todavía.</p>
             ) : (
               categorias.map((cat) => (
-                <div key={cat.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-white/5 hover:bg-slate-800/80 transition-colors">
+                <div
+                  key={cat.id}
+                  className="flex items-center justify-between gap-2 rounded border border-borde px-3 py-2"
+                >
                   {editandoId === cat.id ? (
-                    <div className="flex flex-1 gap-2 mr-2">
-                      <input 
+                    <>
+                      <input
                         type="text"
                         value={editandoNombre}
                         onChange={(e) => setEditandoNombre(e.target.value)}
-                        className="input-premium py-1 text-sm flex-1"
+                        className="campo flex-1 !py-1 text-sm"
                         autoFocus
                         onKeyDown={(e) => e.key === 'Enter' && handleActualizar(cat.id)}
                       />
-                      <button onClick={() => handleActualizar(cat.id)} aria-label="Guardar cambios" className="text-emerald-400 hover:text-emerald-300 p-1">
-                        <Check size={18} />
+                      <button
+                        onClick={() => handleActualizar(cat.id)}
+                        aria-label="Guardar cambios"
+                        className="rounded p-1 text-pagado transition-colors duration-rapida hover:bg-pagado-suave"
+                      >
+                        <Check size={16} />
                       </button>
-                      <button onClick={() => setEditandoId(null)} aria-label="Cancelar edición" className="text-slate-400 hover:text-slate-300 p-1">
-                        <X size={18} />
+                      <button
+                        onClick={() => setEditandoId(null)}
+                        aria-label="Cancelar edición"
+                        className="rounded p-1 text-tinta-tenue transition-colors duration-rapida hover:bg-superficie-sutil"
+                      >
+                        <X size={16} />
                       </button>
-                    </div>
+                    </>
                   ) : (
                     <>
-                      <span className="text-slate-200 font-medium">{cat.nombre}</span>
+                      <span className="text-sm text-tinta">{cat.nombre}</span>
                       <div className="flex gap-1">
                         <button
                           onClick={() => { setEditandoId(cat.id); setEditandoNombre(cat.nombre); }}
                           aria-label={`Editar ${cat.nombre}`}
-                          className="text-blue-400 hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-400/10 transition-colors"
+                          className="rounded p-1 text-tinta-tenue transition-colors duration-rapida hover:bg-superficie-sutil hover:text-tinta"
                         >
-                          <Edit2 size={16} />
+                          <Edit2 size={14} />
                         </button>
                         <button
                           onClick={() => setPendienteEliminarId(cat.id)}
                           aria-label={`Eliminar ${cat.nombre}`}
-                          className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-400/10 transition-colors"
+                          className="rounded p-1 text-tinta-tenue transition-colors duration-rapida hover:bg-deuda-suave hover:text-deuda"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </>
@@ -191,8 +173,7 @@ const ModalCategorias = ({ isOpen, onClose }: ModalCategoriasProps) => {
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </Modal>
     </>
   );
 };

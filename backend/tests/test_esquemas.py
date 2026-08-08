@@ -26,14 +26,24 @@ class TestPagoCuentaRequest:
         req = PagoCuentaRequest(monto_pagado=200)
         assert req.monto_pagado == Decimal("200")
 
-    def test_monto_cero_es_invalido(self):
-        """El campo tiene gt=0, así que 0 no es válido."""
-        with pytest.raises(ValidationError):
-            PagoCuentaRequest(monto_pagado=0)
+    def test_monto_cero_es_valido(self):
+        """Cerrar sin cobrar nada traspasa toda la deuda al mes siguiente."""
+        req = PagoCuentaRequest(monto_pagado=0)
+        assert req.monto_pagado == Decimal("0")
 
     def test_monto_negativo_es_invalido(self):
         with pytest.raises(ValidationError):
             PagoCuentaRequest(monto_pagado=-10)
+
+    def test_descuento_es_opcional(self):
+        """Sin descuento en el body se respeta el ya guardado en la cuenta."""
+        assert PagoCuentaRequest().porcentaje_descuento is None
+
+    def test_descuento_fuera_de_rango_es_invalido(self):
+        with pytest.raises(ValidationError):
+            PagoCuentaRequest(porcentaje_descuento=101)
+        with pytest.raises(ValidationError):
+            PagoCuentaRequest(porcentaje_descuento=-1)
 
 
 class TestClienteCrear:

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Save, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Producto, Categoria, ProductoImpacto } from '../../types';
 import { servicioProducto, servicioCategoria } from '../../services/api';
-import SelectorPremium from '../../components/SelectorPremium';
-import { useTeclaEscape } from '../../hooks/useTeclaEscape';
+import Menu from '../../components/ui/Menu';
+import Boton from '../../components/ui/Boton';
+import Campo from '../../components/ui/Campo';
+import Modal from '../../components/ui/Modal';
 import ModalImpactoProducto from './ModalImpactoProducto';
 
 interface ModalProductoProps {
@@ -82,7 +83,7 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
 
   const handleGuardar = async () => {
     if (!nombre.trim() || precioActual === '') {
-      setError('Por favor, completa los campos requeridos (Nombre y Precio)');
+      setError('Completá los campos requeridos (nombre y precio).');
       return;
     }
 
@@ -119,116 +120,72 @@ const ModalProducto = ({ isOpen, onClose, onSuccess, productoEditar }: ModalProd
     }
   };
 
-  useTeclaEscape(isOpen, onClose);
-
-  if (!isOpen) return null;
-
   return (
     <>
-      <div className="fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={productoEditar ? 'Editar producto' : 'Nuevo producto'}>
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-
-      <div className="bg-[#0b1120] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative z-10 anim-slide-in">
-        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
-          <h2 className="text-xl font-bold text-slate-100">
-            {productoEditar ? 'Editar Producto' : 'Nuevo Producto'}
-          </h2>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
+      <Modal
+        abierto={isOpen}
+        onCerrar={onClose}
+        titulo={productoEditar ? 'Editar producto' : 'Nuevo producto'}
+        ancho="sm"
+        pie={
+          <>
+            <Boton variante="sutil" onClick={onClose}>
+              Cancelar
+            </Boton>
+            <Boton variante="primario" onClick={handleGuardar} cargando={cargando} textoCargando="Guardando…">
+              Guardar
+            </Boton>
+          </>
+        }
+      >
+        <div className="space-y-4">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl flex items-center gap-2 text-sm">
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
+            <p className="border-l-2 border-deuda bg-deuda-suave px-3 py-2 text-sm text-tinta">{error}</p>
           )}
 
-          <div>
-            <label className="block text-slate-400 text-sm font-semibold mb-2">
-              Nombre del Producto *
-            </label>
-            <input
-              type="text"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="input-premium"
-              placeholder="Ej. Café Americano"
+          <Campo
+            etiqueta="Nombre del producto"
+            type="text"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ej. Café americano"
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Campo
+              etiqueta="Precio"
+              type="number"
+              value={precioActual}
+              onChange={(e) => setPrecioActual(e.target.value ? Number(e.target.value) : '')}
+              placeholder="0"
+              min="0"
+            />
+            <Campo
+              etiqueta="Stock"
+              type="number"
+              value={stockActual}
+              onChange={(e) => setStockActual(e.target.value ? Number(e.target.value) : '')}
+              placeholder="0"
+              min="0"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-slate-400 text-sm font-semibold mb-2">
-                Precio ($) *
-              </label>
-              <input
-                type="number"
-                value={precioActual}
-                onChange={(e) => setPrecioActual(e.target.value ? Number(e.target.value) : '')}
-                className="input-premium"
-                placeholder="0"
-                min="0"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-400 text-sm font-semibold mb-2">
-                Stock / Cantidad
-              </label>
-              <input
-                type="number"
-                value={stockActual}
-                onChange={(e) => setStockActual(e.target.value ? Number(e.target.value) : '')}
-                className="input-premium"
-                placeholder="0"
-                min="0"
-              />
-            </div>
-          </div>
-
           <div>
-            <label className="block text-slate-400 text-sm font-semibold mb-2">
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-tinta-tenue">
               Categoría
-            </label>
-            <SelectorPremium
+            </span>
+            <Menu
               value={categoriaId}
               onChange={setCategoriaId}
               opciones={[
-                { value: 'ninguna', label: 'Sin Categoría' },
-                ...categorias.map(c => ({ value: c.id, label: c.nombre }))
+                { value: 'ninguna', label: 'Sin categoría' },
+                ...categorias.map((c) => ({ value: c.id, label: c.nombre })),
               ]}
               className="w-full"
             />
           </div>
         </div>
-
-        <div className="p-6 border-t border-white/5 bg-slate-900/30 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-slate-300 font-medium hover:text-white hover:bg-white/5 rounded-xl transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleGuardar}
-            disabled={cargando}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl transition-colors font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50"
-          >
-            <Save size={18} />
-            {cargando ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
-      </div>
-      </div>
+      </Modal>
 
       <ModalImpactoProducto
         isOpen={!!impactoPrecio}

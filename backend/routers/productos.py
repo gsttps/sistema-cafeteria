@@ -6,6 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from backend.base_datos import obtener_db, obtener_usuario_actual, verificar_rol_admin
+from backend.constantes import PRODUCTOS_ARRASTRE
 from backend.modelos import CuentaMensual, PerdidaInventario, Producto, Transaccion, Usuario
 from backend.esquemas import (
     EliminarProductoRespuesta,
@@ -29,6 +30,10 @@ def leer_productos(
 ):
     # joinedload: la respuesta serializa la categoría de cada producto (N+1)
     consulta = db.query(Producto).options(joinedload(Producto.categoria))
+    # Los productos sintéticos de traspaso de deuda existen solo para colgar las
+    # líneas de arrastre: no son vendibles ni inventariables. Sin este filtro
+    # aparecen en Inventario como productos de $0 que el usuario puede editar.
+    consulta = consulta.filter(Producto.nombre.notin_(PRODUCTOS_ARRASTRE))
     if not incluir_archivados:
         consulta = consulta.filter(Producto.estado == "activo")
     if buscar:

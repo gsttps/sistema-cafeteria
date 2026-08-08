@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Cliente, Producto, CuentaMensual, Transaccion, Categoria, PerdidaInventario, ProductoImpacto } from '../types';
+import {
+  Cliente, Producto, CuentaMensual, Transaccion, Categoria, PerdidaInventario, ProductoImpacto,
+  BalancesMes, EvolucionBalances,
+} from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -37,7 +40,10 @@ api.interceptors.response.use(
 
 
 export const servicioCliente = {
-  obtenerTodos: (buscar?: string) => api.get<Cliente[]>('/clientes/', { params: { buscar } }),
+  // limit explícito: el backend corta en 100 por defecto y el frontend no
+  // pagina, así que sin esto los clientes por encima de 100 desaparecían de la
+  // lista sin ningún aviso. 500 es el máximo que acepta la API.
+  obtenerTodos: (buscar?: string) => api.get<Cliente[]>('/clientes/', { params: { buscar, limit: 500 } }),
   crear: (datos: { nombre: string; telefono?: string; estado?: string }) => api.post<Cliente>('/clientes/', datos),
   actualizar: (id: string, datos: Partial<Cliente>) => api.put<Cliente>(`/clientes/${id}`, datos),
   eliminar: (id: string) => api.delete(`/clientes/${id}`),
@@ -51,7 +57,8 @@ export const servicioCategoria = {
 };
 
 export const servicioProducto = {
-  obtenerTodos: (buscar?: string) => api.get<Producto[]>('/productos/', { params: { buscar } }),
+  // Ver nota en servicioCliente.obtenerTodos: el corte por defecto es 100.
+  obtenerTodos: (buscar?: string) => api.get<Producto[]>('/productos/', { params: { buscar, limit: 500 } }),
   crear: (datos: Omit<Producto, 'id' | 'estado'>) => api.post<Producto>('/productos/', datos),
   actualizar: (id: string, datos: Partial<Omit<Producto, 'id' | 'estado'>> & { actualizar_precios_abiertos?: boolean }) =>
     api.put<Producto>(`/productos/${id}`, datos),
@@ -72,11 +79,10 @@ export const servicioCuenta = {
     api.get<CuentaMensual>(`/cuentas/cliente/${clienteId}`, { params: { mes, anio } }),
   agregarTransaccion: (clienteId: string, datos: { producto_id: string; cantidad: number; mes?: number; anio?: number; dia?: number }) =>
     api.post<Transaccion>(`/cuentas/cliente/${clienteId}/agregar_item`, datos),
-  obtenerHistorial: (clienteId: string) => api.get<CuentaMensual[]>(`/cuentas/cliente/${clienteId}/historial`),
   actualizarDescuento: (cuentaId: string, porcentaje: number) =>
     api.put<CuentaMensual>(`/cuentas/${cuentaId}/descuento`, null, { params: { porcentaje_descuento: porcentaje } }),
-  cerrar: (cuentaId: string, monto_pagado?: number) => 
-    api.put<CuentaMensual>(`/cuentas/${cuentaId}/cerrar`, { monto_pagado }),
+  cerrar: (cuentaId: string, monto_pagado?: number, porcentaje_descuento?: number) =>
+    api.put<CuentaMensual>(`/cuentas/${cuentaId}/cerrar`, { monto_pagado, porcentaje_descuento }),
   eliminarTransaccion: (transaccionId: string) => api.delete(`/cuentas/transaccion/${transaccionId}`),
   pedidoPersonalizado: (clienteId: string, datos: { nombre: string; precio: number; cantidad: number; mes?: number; anio?: number; dia?: number }) =>
     api.post<Transaccion>(`/cuentas/cliente/${clienteId}/pedido_personalizado`, datos),
@@ -111,8 +117,12 @@ export const servicioAuth = {
 };
 
 export const servicioBalances = {
-  obtenerBalancesMes: (mes: number, anio: number) => 
-    api.get('/balances/', { params: { mes, anio } }),
+  obtenerBalancesMes: (mes: number, anio: number, signal?: AbortSignal) =>
+    api.get<BalancesMes>('/balances/', { params: { mes, anio }, signal }),
+  obtenerEvolucion: (mes: number, anio: number, meses = 6, signal?: AbortSignal) =>
+    api.get<EvolucionBalances>('/balances/evolucion', { params: { mes, anio, meses }, signal }),
+  exportarExcel: (mes: number, anio: number) =>
+    api.get<Blob>('/balances/exportar', { params: { mes, anio }, responseType: 'blob' }),
 };
 
 export default api;

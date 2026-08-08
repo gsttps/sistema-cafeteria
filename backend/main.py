@@ -108,6 +108,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    # Necesario para que el frontend pueda leer el nombre del archivo al
+    # descargar el Excel de balances (Content-Disposition no es un header
+    # "simple" y el navegador lo oculta si no se expone explícitamente)
+    expose_headers=["Content-Disposition"],
 )
 
 

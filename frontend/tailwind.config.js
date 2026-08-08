@@ -6,26 +6,70 @@ export default {
   ],
   theme: {
     extend: {
-      // Paleta semántica: mapea intención -> color base de Tailwind.
-      // Permite usar text-primary/bg-success en vez de blue-600/emerald-500 sueltos.
+      // Los colores apuntan a las variables CSS de index.css, nunca a un
+      // hexadecimal. Así el tema claro futuro es un bloque de overrides y no
+      // una reescritura de componentes.
       colors: {
-        primary: {
-          DEFAULT: '#3b82f6', // blue-500
-          hover: '#60a5fa',   // blue-400
-          soft: 'rgba(59, 130, 246, 0.1)',
+        superficie: {
+          DEFAULT: 'var(--superficie)',
+          elevada: 'var(--superficie-elevada)',
+          alta: 'var(--superficie-alta)',
+          sutil: 'var(--superficie-sutil)',
         },
-        success: {
-          DEFAULT: '#10b981', // emerald-500
-          hover: '#34d399',   // emerald-400
+        borde: {
+          DEFAULT: 'var(--borde)',
+          fuerte: 'var(--borde-fuerte)',
         },
-        danger: {
-          DEFAULT: '#f43f5e', // rose-500
-          hover: '#fb7185',   // rose-400
+        tinta: {
+          DEFAULT: 'var(--tinta)',
+          suave: 'var(--tinta-suave)',
+          tenue: 'var(--tinta-tenue)',
         },
-        warning: {
-          DEFAULT: '#f59e0b', // amber-500
-          hover: '#fbbf24',   // amber-400
+        acento: {
+          DEFAULT: 'var(--acento)',
+          tenue: 'var(--acento-tenue)',
+          suave: 'var(--acento-suave)',
+          borde: 'var(--acento-borde)',
+          contraste: 'var(--acento-contraste)',
         },
+        // Reservados para el estado financiero. No usar de decoración.
+        deuda: {
+          DEFAULT: 'var(--deuda)',
+          suave: 'var(--deuda-suave)',
+          borde: 'var(--deuda-borde)',
+        },
+        pagado: {
+          DEFAULT: 'var(--pagado)',
+          suave: 'var(--pagado-suave)',
+          borde: 'var(--pagado-borde)',
+        },
+        velo: 'var(--velo)',
+      },
+      borderColor: {
+        DEFAULT: 'var(--borde)',
+      },
+      borderRadius: {
+        sm: 'var(--radio-sm)',
+        DEFAULT: 'var(--radio)',
+        md: 'var(--radio)',
+        lg: 'var(--radio-lg)',
+      },
+      fontFamily: {
+        sans: ['Archivo Variable', 'system-ui', '-apple-system', 'sans-serif'],
+        cifra: ['IBM Plex Mono', 'ui-monospace', 'SF Mono', 'monospace'],
+      },
+      transitionDuration: {
+        rapida: 'var(--t-rapida)',
+        entrada: 'var(--t-entrada)',
+      },
+      keyframes: {
+        aparecer: {
+          from: { opacity: '0', transform: 'translateY(4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        aparecer: 'aparecer var(--t-entrada) ease-out',
       },
       // Escala de z-index semántica para evitar el caos de z-50 / z-[200] / z-[9999].
       // Orden de apilamiento: header < dropdown < modal < modal anidado (confirmación).

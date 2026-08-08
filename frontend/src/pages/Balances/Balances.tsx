@@ -1,217 +1,253 @@
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { Download } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useCallback, useEffect, useState } from 'react';
+import axios from 'axios';
+import { AlertCircle, Coins, PiggyBank, Receipt, TrendingUp } from 'lucide-react';
 import SelectorMes from '../../components/SelectorMes';
 import { servicioBalances } from '../../services/api';
-import { formatoDinero } from '../../utils/formato';
-
-const NOMBRES_MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
-
-interface ProductoTop {
-  nombre: string;
-  cantidad_vendida: number;
-}
-
-interface ClienteTop {
-  nombre: string;
-  total_gastado: number;
-}
-
-interface BalancesData {
-  total_pagado: number;
-  total_pendiente: number;
-  productos_top: ProductoTop[];
-  clientes_top: ClienteTop[];
-}
-
-const COLORS = ['#34d399', '#60a5fa', '#f87171', '#fbbf24', '#a78bfa'];
+import { BalancesMes, PuntoEvolucion } from '../../types';
+import { SERIE } from '../../utils/paletaGraficos';
+import Boton from '../../components/ui/Boton';
+import Tarjeta from '../../components/ui/Tarjeta';
+import BarraEstadisticas from './BarraEstadisticas';
+import BotonExportar from './BotonExportar';
+import EstadoVacio from './EstadoVacio';
+import GraficoEvolucion from './GraficoEvolucion';
+import GraficoRankingHorizontal from './GraficoRankingHorizontal';
+import GraficoVentasDiarias from './GraficoVentasDiarias';
+import ListaClientesTop from './ListaClientesTop';
+import PanelMermas from './PanelMermas';
+import TablaDeudores from './TablaDeudores';
+import TarjetaKPI from './TarjetaKPI';
+import TarjetaStockBajo from './TarjetaStockBajo';
 
 const Balances = () => {
-  const [cargando, setCargando] = useState(false);
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [anio, setAnio] = useState(new Date().getFullYear());
-  const [data, setData] = useState<BalancesData | null>(null);
+  const [datos, setDatos] = useState<BalancesMes | null>(null);
+  const [evolucion, setEvolucion] = useState<PuntoEvolucion[] | null>(null);
+  const [mesesEvolucion, setMesesEvolucion] = useState(6);
+  const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reintento, setReintento] = useState(0);
+  // Ordenar el top de productos por monto vendido o por unidades
+  const [ordenProductos, setOrdenProductos] = useState<'monto' | 'unidades'>('monto');
 
   useEffect(() => {
-    const fetchBalances = async () => {
-      setCargando(true);
-      try {
-        const respuesta = await servicioBalances.obtenerBalancesMes(mes, anio);
-        setData(respuesta.data);
-      } catch (error) {
-        console.error('Error obteniendo balances:', error);
-      } finally {
-        setCargando(false);
+    const controlador = new AbortController();
+    // Solo la primera carga muestra el splash; los cambios de mes mantienen el
+    // render anterior atenuado, para evitar el parpadeo y el salto de layout.
+    setDatos((actuales) => {
+      if (actuales === null) setCargando(true);
+      else setRefrescando(true);
+      return actuales;
+    });
+
+    (async () => {
+      const [resBalance, resEvolucion] = await Promise.allSettled([
+        servicioBalances.obtenerBalancesMes(mes, anio, controlador.signal),
+        servicioBalances.obtenerEvolucion(mes, anio, mesesEvolucion, controlador.signal),
+      ]);
+
+      if (controlador.signal.aborted) return;
+
+      if (resBalance.status === 'fulfilled') {
+        setDatos(resBalance.value.data);
+        setError(null);
+      } else if (!axios.isCancel(resBalance.reason)) {
+        console.error('Error al cargar balances:', resBalance.reason);
+        setError('No se pudieron cargar los balances.');
       }
-    };
-    
-    fetchBalances();
-  }, [mes, anio]);
 
+      // Si falla solo la evolución, los KPIs igual se muestran
+      if (resEvolucion.status === 'fulfilled') setEvolucion(resEvolucion.value.data.puntos);
+      else if (!axios.isCancel(resEvolucion.reason)) setEvolucion(null);
 
+      setCargando(false);
+      setRefrescando(false);
+    })();
 
-  const totalEsperado = data ? Number(data.total_pagado) + Number(data.total_pendiente) : 0;
+    return () => controlador.abort();
+  }, [mes, anio, mesesEvolucion, reintento]);
 
-  const descargarReporte = () => {
-    if (!data) return;
-    // Construye un CSV con resumen, productos top y clientes top.
-    // Se usa ';' como separador (Excel en es-CL lo interpreta por columnas).
-    const escapar = (valor: string | number) => {
-      const texto = String(valor);
-      return /[";\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
-    };
-    const filas: (string | number)[][] = [
-      ['Reporte de Balances', `${NOMBRES_MESES[mes - 1]} ${anio}`],
-      [],
-      ['Resumen'],
-      ['Total Pagado', Number(data.total_pagado)],
-      ['Total Pendiente', Number(data.total_pendiente)],
-      ['Ingreso Proyectado', totalEsperado],
-      [],
-      ['Productos Más Vendidos'],
-      ['Producto', 'Cantidad Vendida'],
-      ...data.productos_top.map((p) => [p.nombre, p.cantidad_vendida]),
-      [],
-      ['Mejores Clientes'],
-      ['Cliente', 'Total Gastado'],
-      ...data.clientes_top.map((c) => [c.nombre, Number(c.total_gastado)]),
-    ];
-    const csv = filas.map((fila) => fila.map(escapar).join(';')).join('\n');
-    // BOM para que Excel reconozca UTF-8 (acentos)
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const enlace = document.createElement('a');
-    enlace.href = url;
-    enlace.download = `balances_${anio}_${String(mes).padStart(2, '0')}.csv`;
-    enlace.click();
-    URL.revokeObjectURL(url);
-    toast.success('Reporte descargado.');
-  };
+  const cambiarPeriodo = useCallback((nuevoMes: number, nuevoAnio: number) => {
+    setMes(nuevoMes);
+    setAnio(nuevoAnio);
+  }, []);
+
+  if (cargando && datos === null) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-borde-fuerte border-t-acento" />
+        <p className="text-sm text-tinta-tenue">Cargando balances…</p>
+      </div>
+    );
+  }
+
+  if (error && datos === null) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+        <AlertCircle size={28} className="text-deuda" />
+        <div>
+          <p className="text-sm text-tinta">{error}</p>
+          <p className="mt-1 text-xs text-tinta-tenue">Revisá la conexión e intentá de nuevo.</p>
+        </div>
+        <Boton variante="secundario" onClick={() => setReintento((n) => n + 1)}>
+          Reintentar
+        </Boton>
+      </div>
+    );
+  }
+
+  if (!datos) return null;
+
+  const r = datos.resumen;
+  const productosOrdenados = [...datos.productos_top].sort((a, b) =>
+    ordenProductos === 'monto'
+      ? b.monto_vendido - a.monto_vendido
+      : b.cantidad_vendida - a.cantidad_vendida,
+  );
+  // Con una sola categoría el gráfico no aporta nada (hoy los productos no
+  // tienen categorías asignadas): se muestra un mensaje que lo explica.
+  const hayCategoriasUtiles = datos.ventas_por_categoria.length >= 2;
 
   return (
-    <div className="anim-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 pb-2">
+      {/* Fila de filtros: única, arriba de todo lo que scopea */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-slate-100 text-2xl sm:text-3xl" style={{ fontWeight: '800', marginBottom: '0.5rem', letterSpacing: '-0.025em' }}>
-            Balances Mensuales
-          </h1>
-          <p className="text-slate-400 text-sm sm:text-base">
-            Resumen financiero y métricas clave
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight text-tinta">Balances</h1>
+          <p className="text-sm text-tinta-tenue">Resumen financiero y métricas del negocio</p>
         </div>
-        
-        {/* Selector de Mes reutilizado del Panel de Atención */}
-        <div className="relative z-dropdown w-full sm:w-[300px]">
-          <SelectorMes 
-            mes={mes} 
-            anio={anio} 
-            onChange={async (nuevoMes, nuevoAnio) => {
-              setMes(nuevoMes);
-              setAnio(nuevoAnio);
-            }} 
-          />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative z-dropdown w-full sm:w-64">
+            <SelectorMes mes={mes} anio={anio} onChange={cambiarPeriodo} />
+          </div>
+          <BotonExportar mes={mes} anio={anio} />
         </div>
       </div>
 
-      {cargando ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-4xl animate-pulse">☕</div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-          
-          {/* Left Column (Charts and Metrics) */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Top Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              <div className="bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:bg-slate-800/90">
-                <p className="text-emerald-400/80 text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider">Total Pagado</p>
-                <p className="text-emerald-400 text-2xl sm:text-3xl font-bold">{formatoDinero(Number(data?.total_pagado || 0))}</p>
-              </div>
-              <div className="bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:bg-slate-800/90">
-                <p className="text-rose-400/80 text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider">Total Pendiente</p>
-                <p className="text-rose-400 text-2xl sm:text-3xl font-bold">{formatoDinero(Number(data?.total_pendiente || 0))}</p>
-              </div>
-              <div className="bg-slate-800/80 backdrop-blur-md border border-blue-500/20 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:bg-slate-800/90">
-                <p className="text-blue-400/80 text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider">Ingreso Proyectado</p>
-                <p className="text-blue-400 text-2xl sm:text-3xl font-bold">{formatoDinero(totalEsperado)}</p>
-              </div>
-            </div>
-
-            {/* Chart */}
-            <div className="bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-6 transition-all duration-300 hover:bg-slate-800/90">
-              <h2 className="text-slate-100 text-lg sm:text-xl font-bold mb-4 sm:mb-6">Productos Más Vendidos</h2>
-              <div className="h-56 sm:h-72">
-                {data?.productos_top && data.productos_top.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={data.productos_top}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="nombre" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                      <YAxis stroke="#94a3b8" tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                      <Tooltip 
-                        cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
-                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#f1f5f9' }}
-                      />
-                      <Bar dataKey="cantidad_vendida" name="Cantidad Vendida" radius={[4, 4, 0, 0]}>
-                        {data.productos_top.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center border border-dashed border-slate-600 rounded-xl bg-slate-900/50">
-                    <p className="text-slate-400 font-medium">No hay ventas registradas en este mes</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column (Top Customers List) */}
-          <div className="bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-lg shadow-black/40 rounded-2xl p-4 sm:p-6 flex flex-col h-full transition-all duration-300 hover:bg-slate-800/90">
-            <h2 className="text-slate-100 text-lg sm:text-xl font-bold mb-4 sm:mb-6">Mejores Clientes</h2>
-            
-            <div className="space-y-4 flex-1">
-              {data?.clientes_top && data.clientes_top.length > 0 ? (
-                data.clientes_top.map((cliente, index) => (
-                  <div key={index} className="flex justify-between items-center p-4 bg-slate-900/50 rounded-xl border border-white/5 hover:bg-slate-900/80 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-xs border border-white/10">
-                        {index + 1}
-                      </div>
-                      <span className="text-slate-200 font-medium">{cliente.nombre}</span>
-                    </div>
-                    <span className="text-emerald-400 font-semibold">{formatoDinero(Number(cliente.total_gastado))}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="p-4 bg-slate-900/50 rounded-xl border border-white/5 text-center">
-                  <span className="text-slate-500 text-sm">No hay clientes con gastos este mes</span>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={descargarReporte}
-              disabled={!data}
-              className="mt-6 w-full py-3 bg-blue-600/20 hover:bg-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed text-blue-400 font-semibold rounded-xl border border-blue-500/30 transition-colors duration-200 flex items-center justify-center gap-2"
-            >
-              <Download size={18} />
-              Descargar Reporte Detallado
-            </button>
-          </div>
-
+      {error && (
+        <div className="flex items-center justify-between gap-3 border-l-2 border-acento bg-acento-suave px-3 py-2 text-sm text-tinta">
+          <span className="flex items-center gap-2">
+            <AlertCircle size={15} className="text-acento" />
+            No se pudo actualizar. Mostrando los últimos datos cargados.
+          </span>
+          <button
+            onClick={() => setReintento((n) => n + 1)}
+            className="shrink-0 font-medium underline decoration-acento/50 underline-offset-2"
+          >
+            Reintentar
+          </button>
         </div>
       )}
+
+      <div
+        className={`flex flex-col gap-4 transition-opacity duration-entrada ${
+          refrescando ? 'pointer-events-none opacity-50' : 'opacity-100'
+        }`}
+      >
+        {/* 1. KPIs principales */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <TarjetaKPI etiqueta="Ventas del mes" metrica={r.ventas} sentido="masEsMejor"
+                      icono={<TrendingUp size={14} />} nota="Consumo real, sin arrastres de deuda" />
+          <TarjetaKPI etiqueta="Cobrado" metrica={r.cobrado} sentido="masEsMejor"
+                      icono={<PiggyBank size={14} />} />
+          <TarjetaKPI etiqueta="Por cobrar" metrica={r.por_cobrar} sentido="menosEsMejor"
+                      icono={<Coins size={14} />} />
+          <TarjetaKPI etiqueta="Gasto promedio por cliente" metrica={r.ticket_promedio} sentido="masEsMejor"
+                      icono={<Receipt size={14} />} />
+        </div>
+
+        {/* 2. Estadísticas secundarias */}
+        <BarraEstadisticas resumen={r} />
+
+        {/* 3. Evolución multi-mes */}
+        <GraficoEvolucion puntos={evolucion} meses={mesesEvolucion} onCambiarMeses={setMesesEvolucion} />
+
+        {/* 4. Ventas por día + categorías */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <GraficoVentasDiarias datos={datos.ventas_por_dia} fueraDeRango={datos.consumo_fuera_de_rango} />
+          </div>
+          <Tarjeta>
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold text-tinta">Por categoría</h2>
+              <p className="text-xs text-tinta-tenue">Distribución de las ventas del mes</p>
+            </div>
+            {hayCategoriasUtiles ? (
+              <GraficoRankingHorizontal
+                datos={datos.ventas_por_categoria.map((c) => ({ etiqueta: c.nombre, valor: c.monto }))}
+                color={SERIE[4]}
+                nombreSerie="Vendido"
+                altura="h-56 sm:h-64"
+              />
+            ) : (
+              <EstadoVacio
+                mensaje={
+                  datos.ventas_por_categoria.length === 1
+                    ? 'Asigná categorías a tus productos en Inventario para ver esta distribución'
+                    : 'No hay ventas registradas en este mes'
+                }
+                altura="h-56 sm:h-64"
+              />
+            )}
+          </Tarjeta>
+        </div>
+
+        {/* 5. Top productos + mejores clientes */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <Tarjeta className="lg:col-span-2">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-tinta">Productos más vendidos</h2>
+                <p className="text-xs text-tinta-tenue">Top 10 del mes</p>
+              </div>
+              <div className="flex gap-1 rounded border border-borde p-0.5">
+                {(['monto', 'unidades'] as const).map((modo) => (
+                  <button
+                    key={modo}
+                    onClick={() => setOrdenProductos(modo)}
+                    className={`rounded-sm px-2.5 py-1 text-xs transition-colors duration-rapida ${
+                      ordenProductos === modo
+                        ? 'bg-acento-suave text-acento'
+                        : 'text-tinta-tenue hover:text-tinta'
+                    }`}
+                  >
+                    Por {modo}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <GraficoRankingHorizontal
+              datos={productosOrdenados.map((p) => ({
+                etiqueta: p.nombre,
+                valor: ordenProductos === 'monto' ? p.monto_vendido : p.cantidad_vendida,
+              }))}
+              color={SERIE[1]}
+              formato={ordenProductos === 'monto' ? 'dinero' : 'entero'}
+              nombreSerie={ordenProductos === 'monto' ? 'Vendido' : 'Unidades'}
+              mensajeVacio="No hay ventas registradas en este mes"
+              altura="h-72 sm:h-80"
+            />
+          </Tarjeta>
+          <ListaClientesTop clientes={datos.clientes_top} />
+        </div>
+
+        {/* 6. Deudores */}
+        <TablaDeudores deudores={datos.deudores} />
+
+        {/* 7. Mermas + stock bajo */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <PanelMermas
+              valorMermas={r.valor_mermas}
+              porMotivo={datos.mermas_por_motivo}
+              porProducto={datos.mermas_por_producto}
+            />
+          </div>
+          <TarjetaStockBajo productos={datos.stock_bajo} />
+        </div>
+      </div>
     </div>
   );
 };

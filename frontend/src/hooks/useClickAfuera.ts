@@ -3,7 +3,7 @@ import { useEffect, useRef, RefObject } from 'react';
 /**
  * Hook reutilizable para cerrar popups/dropdowns al hacer clic/tocar fuera del
  * contenedor o al presionar Escape.
- * Reemplaza la lógica duplicada en MenuDesplegable, SelectorMes y SelectorPremium.
+ * Reemplaza la lógica duplicada en Menu y SelectorMes.
  */
 export function useClickAfuera<T extends HTMLElement>(onClickAfuera: () => void): RefObject<T> {
   const ref = useRef<T>(null);

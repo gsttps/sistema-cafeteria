@@ -1,119 +1,86 @@
-import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { X, DollarSign, AlertCircle } from 'lucide-react';
-import { useTeclaEscape } from '../../hooks/useTeclaEscape';
+import { useEffect, useState } from 'react';
+import { formatoDinero } from '../../utils/formato';
+import Boton from '../../components/ui/Boton';
+import Modal from '../../components/ui/Modal';
+import Monto from '../../components/ui/Monto';
 
 interface ModalPagoParcialProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (montoPagado: number) => void;
+  abierto: boolean;
+  onCerrar: () => void;
+  onConfirmar: (montoPagado: number) => void;
   totalCuenta: number;
 }
 
-export default function ModalPagoParcial({ isOpen, onClose, onConfirm, totalCuenta }: ModalPagoParcialProps) {
-  const [monto, setMonto] = useState<string>(totalCuenta.toString());
-
-  useTeclaEscape(isOpen, onClose);
+/**
+ * Registra el pago y cierra el mes. Si el cliente paga menos del total, el
+ * saldo se arrastra al mes siguiente.
+ */
+export default function ModalPagoParcial({
+  abierto,
+  onCerrar,
+  onConfirmar,
+  totalCuenta,
+}: ModalPagoParcialProps) {
+  const [monto, setMonto] = useState(String(totalCuenta));
 
   useEffect(() => {
-    if (isOpen) {
-      setMonto(totalCuenta.toString());
-    }
-  }, [isOpen, totalCuenta]);
+    if (abierto) setMonto(String(totalCuenta));
+  }, [abierto, totalCuenta]);
 
-  if (!isOpen) return null;
+  const montoNumero = parseInt(monto) || 0;
+  const saldo = totalCuenta - montoNumero;
 
-  const handleConfirm = () => {
-    const numMonto = parseInt(monto) || 0;
-    if (numMonto < 0) return;
-    if (numMonto > totalCuenta) {
-      onConfirm(totalCuenta); // No permitimos pagar más del total
-    } else {
-      onConfirm(numMonto);
-    }
+  const confirmar = () => {
+    if (montoNumero < 0) return;
+    // No se admite cobrar de más: el excedente no tiene dónde registrarse.
+    onConfirmar(Math.min(montoNumero, totalCuenta));
   };
 
-  const numMonto = parseInt(monto) || 0;
-  const deuda = totalCuenta - numMonto;
-
-  const modalContent = (
-    <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-md z-modal flex items-center justify-center p-4 anim-fade-in" role="dialog" aria-modal="true" aria-label="Cerrar cuenta">
-      <div className="bg-[#0b1120] border border-slate-700/50 rounded-3xl w-full max-w-lg shadow-2xl shadow-black/50 overflow-hidden">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-800/50 flex justify-between items-center bg-slate-900/30">
-          <div className="flex items-center gap-3 text-slate-100">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shadow-inner">
-              <DollarSign size={20} className="text-emerald-400" />
-            </div>
-            <h3 className="font-bold text-xl">Cerrar Cuenta</h3>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 space-y-6">
-          <div className="flex justify-between items-center p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
-            <span className="text-slate-400 font-semibold text-sm">Total de la Cuenta</span>
-            <span className="text-2xl font-bold text-slate-100">${totalCuenta.toLocaleString('es-CL')}</span>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2 ml-1">
-              ¿Cuánto paga el cliente?
-            </label>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <span className="text-emerald-400 font-bold">$</span>
-              </div>
-              <input
-                type="number"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                className="input-premium !pl-10 text-lg font-bold"
-                placeholder="Monto a pagar..."
-                min="0"
-                max={totalCuenta}
-              />
-            </div>
-          </div>
-
-          {deuda > 0 && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-3 anim-fade-in">
-              <AlertCircle size={20} className="text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-amber-400 font-bold text-sm">Pago Parcial</h4>
-                <p className="text-amber-200/80 text-sm mt-1 leading-relaxed">
-                  El saldo pendiente de <strong className="text-amber-300">${deuda.toLocaleString('es-CL')}</strong> será traspasado automáticamente como "Deuda anterior" al próximo mes.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 pt-0 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3.5 px-4 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors"
-          >
+  return (
+    <Modal
+      abierto={abierto}
+      onCerrar={onCerrar}
+      titulo="Registrar pago"
+      ancho="sm"
+      pie={
+        <>
+          <Boton variante="sutil" onClick={onCerrar}>
             Cancelar
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="flex-1 py-3.5 px-4 rounded-xl font-bold text-white bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all duration-300 transform hover:scale-[1.02]"
-          >
-            Confirmar Pago
-          </button>
-        </div>
+          </Boton>
+          <Boton variante="primario" onClick={confirmar}>
+            Registrar pago
+          </Boton>
+        </>
+      }
+    >
+      <div className="flex items-baseline justify-between gap-4 border-b border-borde pb-3">
+        <span className="text-sm text-tinta-suave">Total del mes</span>
+        <Monto valor={totalCuenta} tono="total" grande />
       </div>
-    </div>
-  );
 
-  return createPortal(modalContent, document.body);
+      <div className="mt-4">
+        <label htmlFor="monto-pago" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-tinta-tenue">
+          ¿Cuánto paga?
+        </label>
+        <input
+          id="monto-pago"
+          type="number"
+          value={monto}
+          onChange={(e) => setMonto(e.target.value)}
+          min="0"
+          max={totalCuenta}
+          autoFocus
+          className="cifra w-full rounded border border-borde-fuerte bg-superficie px-3 py-2
+            text-lg text-tinta transition-colors duration-rapida focus:border-acento focus:outline-none"
+        />
+      </div>
+
+      {saldo > 0 && (
+        <p className="mt-3 border-l-2 border-deuda bg-deuda-suave px-3 py-2 text-sm text-tinta-suave">
+          Quedan <span className="cifra text-deuda">{formatoDinero(saldo)}</span> pendientes. El saldo
+          pasa al mes siguiente como deuda anterior.
+        </p>
+      )}
+    </Modal>
+  );
 }

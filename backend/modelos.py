@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from backend.base_datos import Base
@@ -59,7 +59,7 @@ class Producto(Base):
     nombre = Column(String(100), unique=True, index=True, nullable=False)
     precio_actual = Column(Numeric(10, 2), nullable=False)
     stock_actual = Column(Integer, nullable=False, default=0)
-    categoria_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    categoria_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True)
     estado = Column(String(20), default="activo", nullable=False, index=True) # 'activo' o 'archivado'
 
     # Relaciones
@@ -72,11 +72,11 @@ class PerdidaInventario(Base):
     __tablename__ = "inventory_losses"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    producto_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    producto_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
     cantidad = Column(Integer, default=1, nullable=False)
     motivo = Column(String(200), nullable=True)
     costo_historico = Column(Numeric(10, 2), nullable=False) # Congela el precio al momento de la pérdida
-    fecha_hora = Column(DateTime(timezone=True), default=utc_ahora, nullable=False)
+    fecha_hora = Column(DateTime(timezone=True), default=utc_ahora, nullable=False, index=True)
 
     # Relaciones
     producto = relationship("Producto", back_populates="perdidas")
@@ -95,6 +95,15 @@ class CuentaMensual(Base):
     # __table_args__ = (
     #     UniqueConstraint("cliente_id", "mes", "anio", name="uq_cliente_mes_anio"),
     # )
+    __table_args__ = (
+        # Cubre el filtro "WHERE cliente_id = X AND anio = Y AND mes = Z AND
+        # estado = 'abierta'" que se repite en cada carga/alta del Panel de
+        # Atención (leer_cuenta_actual, agregar_transaccion, pedido_personalizado).
+        Index("ix_monthly_tabs_cliente_periodo_estado", "cliente_id", "anio", "mes", "estado"),
+        # Cubre el "WHERE anio = X AND mes = Y" sin cliente que arma cada
+        # métrica de Balances (se repite ~10 veces en balances.py).
+        Index("ix_monthly_tabs_periodo", "anio", "mes"),
+    )
 
     # Relaciones
     cliente = relationship("Cliente", back_populates="cuentas")
@@ -104,11 +113,11 @@ class Transaccion(Base):
     __tablename__ = "transactions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    cuenta_mensual_id = Column(UUID(as_uuid=True), ForeignKey("monthly_tabs.id", ondelete="CASCADE"), nullable=False)
-    producto_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="RESTRICT"), nullable=True)
+    cuenta_mensual_id = Column(UUID(as_uuid=True), ForeignKey("monthly_tabs.id", ondelete="CASCADE"), nullable=False, index=True)
+    producto_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="RESTRICT"), nullable=True, index=True)
     cantidad = Column(Integer, default=1, nullable=False)
     precio_historico = Column(Numeric(10, 2), nullable=False) # Congela el precio al momento de la compra
-    fecha_hora = Column(DateTime(timezone=True), default=utc_ahora, nullable=False)
+    fecha_hora = Column(DateTime(timezone=True), default=utc_ahora, nullable=False, index=True)
 
     # Relaciones
     cuenta_mensual = relationship("CuentaMensual", back_populates="transacciones")

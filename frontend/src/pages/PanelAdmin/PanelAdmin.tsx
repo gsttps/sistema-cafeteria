@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { servicioAuth } from '../../services/api';
-import { Settings, Lock, Image as ImageIcon, Coffee, Trash2, Upload } from 'lucide-react';
+import { Coffee, Trash2, Upload } from 'lucide-react';
+import Boton from '../../components/ui/Boton';
+import Campo from '../../components/ui/Campo';
+import Tarjeta from '../../components/ui/Tarjeta';
 
 function PanelAdmin() {
   // Estados de Configuración de Cuenta
@@ -40,7 +43,7 @@ function PanelAdmin() {
 
     try {
       await servicioAuth.cambiarUsername(passActualUser, nuevoUsername);
-      mostrarAlerta('exito', `Nombre de usuario cambiado a "${nuevoUsername}" exitosamente.`);
+      mostrarAlerta('exito', `Nombre de usuario cambiado a "${nuevoUsername}".`);
       setPassActualUser('');
       setNuevoUsername('');
     } catch (error: any) {
@@ -64,7 +67,7 @@ function PanelAdmin() {
 
     try {
       await servicioAuth.cambiarPassword(passActualPass, nuevaPassword);
-      mostrarAlerta('exito', 'Contraseña actualizada exitosamente.');
+      mostrarAlerta('exito', 'Contraseña actualizada.');
       setPassActualPass('');
       setNuevaPassword('');
       setConfirmarPassword('');
@@ -90,7 +93,7 @@ function PanelAdmin() {
 
     try {
       await servicioAuth.subirLogo(archivo);
-      mostrarAlerta('exito', 'Logo actualizado exitosamente.');
+      mostrarAlerta('exito', 'Logo actualizado.');
       setTieneLogo(true);
     } catch (error) {
       console.error('Error al subir logo:', error);
@@ -111,188 +114,140 @@ function PanelAdmin() {
     }
   };
 
+  const errorContrasenas = confirmarPassword !== '' && confirmarPassword !== nuevaPassword;
+
   return (
-    <div className="max-w-6xl mx-auto h-full flex flex-col anim-fade-in">
-      <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight m-0">
-          Panel de Administración
-        </h1>
-      </div>
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4">
+      <h1 className="text-xl font-semibold tracking-tight text-tinta">Administración</h1>
 
       {mensaje && (
-        <div className={`p-4 rounded-xl mb-6 font-semibold text-sm border anim-slide-in ${
-          mensaje.tipo === 'exito' 
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
-            : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-        }`}>
+        <p
+          className={`border-l-2 px-3 py-2 text-sm ${
+            mensaje.tipo === 'exito'
+              ? 'border-pagado bg-pagado-suave text-tinta'
+              : 'border-deuda bg-deuda-suave text-tinta'
+          }`}
+        >
           {mensaje.texto}
-        </div>
+        </p>
       )}
 
-      <div className="flex flex-col gap-6 anim-fade-in">
-        {/* SECCIÓN: Cambiar Nombre de Usuario */}
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700 p-5 sm:p-8 shadow-xl shadow-black/20">
-          <h3 className="m-0 mb-2 text-slate-100 text-xl font-bold flex items-center gap-2">
-            <Settings size={20} className="text-blue-500" /> Cambiar Nombre de Usuario
-          </h3>
-          <p className="text-slate-400 text-sm mb-6">
-            Se requiere la contraseña actual para confirmar el cambio.
-          </p>
-          <form onSubmit={guardarNuevoUsername} className="flex flex-col gap-5 max-w-md">
-            <div>
-              <label className="block mb-2 font-semibold text-slate-400 text-sm">Contraseña Actual</label>
-              <input
-                type="password"
-                value={passActualUser}
-                onChange={(e) => setPassActualUser(e.target.value)}
-                placeholder="Ingrese su contraseña actual"
-                required
-                autoComplete="current-password"
-                className="input-premium"
-              />
-            </div>
-            <div>
-              <label className="block mb-2 font-semibold text-slate-400 text-sm">Nuevo Nombre de Usuario</label>
-              <input
-                type="text"
-                value={nuevoUsername}
-                onChange={(e) => setNuevoUsername(e.target.value)}
-                placeholder="Ingrese el nuevo nombre de usuario"
-                required
-                minLength={3}
-                maxLength={50}
-                autoComplete="username"
-                className="input-premium"
-              />
-            </div>
-            <button type="submit" className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-blue-500/20 mt-2">
-              Guardar Nombre de Usuario
-            </button>
-          </form>
-        </div>
+      <Tarjeta titulo="Nombre de usuario">
+        <p className="mb-4 text-sm text-tinta-suave">
+          Se requiere la contraseña actual para confirmar el cambio.
+        </p>
+        <form onSubmit={guardarNuevoUsername} className="max-w-sm space-y-4">
+          <Campo
+            etiqueta="Contraseña actual"
+            type="password"
+            value={passActualUser}
+            onChange={(e) => setPassActualUser(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+          <Campo
+            etiqueta="Nuevo nombre de usuario"
+            type="text"
+            value={nuevoUsername}
+            onChange={(e) => setNuevoUsername(e.target.value)}
+            required
+            minLength={3}
+            maxLength={50}
+            autoComplete="username"
+          />
+          <Boton variante="primario" type="submit">
+            Guardar nombre de usuario
+          </Boton>
+        </form>
+      </Tarjeta>
 
-        {/* SECCIÓN: Cambiar Contraseña */}
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700 p-5 sm:p-8 shadow-xl shadow-black/20">
-          <h3 className="m-0 mb-2 text-slate-100 text-xl font-bold flex items-center gap-2">
-            <Lock size={20} className="text-blue-500" /> Cambiar Contraseña
-          </h3>
-          <p className="text-slate-400 text-sm mb-6">
-            Debe ingresar la contraseña actual y luego la nueva contraseña dos veces para confirmar.
-          </p>
-          <form onSubmit={guardarNuevaPassword} className="flex flex-col gap-5 max-w-md">
-            <div>
-              <label className="block mb-2 font-semibold text-slate-400 text-sm">Contraseña Actual</label>
-              <input
-                type="password"
-                value={passActualPass}
-                onChange={(e) => setPassActualPass(e.target.value)}
-                placeholder="Ingrese su contraseña actual"
-                required
-                autoComplete="current-password"
-                className="input-premium"
+      <Tarjeta titulo="Contraseña">
+        <p className="mb-4 text-sm text-tinta-suave">
+          Ingresá la contraseña actual y la nueva dos veces para confirmar.
+        </p>
+        <form onSubmit={guardarNuevaPassword} className="max-w-sm space-y-4">
+          <Campo
+            etiqueta="Contraseña actual"
+            type="password"
+            value={passActualPass}
+            onChange={(e) => setPassActualPass(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+          <Campo
+            etiqueta="Nueva contraseña"
+            type="password"
+            value={nuevaPassword}
+            onChange={(e) => setNuevaPassword(e.target.value)}
+            placeholder="Mínimo 4 caracteres"
+            required
+            minLength={4}
+            autoComplete="new-password"
+          />
+          <Campo
+            etiqueta="Confirmar nueva contraseña"
+            type="password"
+            value={confirmarPassword}
+            onChange={(e) => setConfirmarPassword(e.target.value)}
+            required
+            minLength={4}
+            autoComplete="new-password"
+            error={errorContrasenas}
+            nota={errorContrasenas ? 'Las contraseñas no coinciden.' : undefined}
+          />
+          <Boton variante="primario" type="submit">
+            Guardar nueva contraseña
+          </Boton>
+        </form>
+      </Tarjeta>
+
+      <Tarjeta titulo="Logo de la pantalla de ingreso">
+        <p className="mb-4 text-sm text-tinta-suave">
+          Imagen JPG o PNG que se muestra en la pantalla de inicio de sesión.
+        </p>
+
+        <div className="flex flex-wrap items-start gap-6">
+          <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded border border-dashed border-borde-fuerte bg-superficie">
+            {logoPreview ? (
+              <img src={logoPreview} alt="" className="h-full w-full object-cover" />
+            ) : tieneLogo ? (
+              <img
+                src={servicioAuth.obtenerLogoUrl() + '?t=' + Date.now()}
+                alt="Logo actual"
+                className="h-full w-full object-cover"
               />
-            </div>
-            <div>
-              <label className="block mb-2 font-semibold text-slate-400 text-sm">Nueva Contraseña</label>
-              <input
-                type="password"
-                value={nuevaPassword}
-                onChange={(e) => setNuevaPassword(e.target.value)}
-                placeholder="Mínimo 4 caracteres"
-                required
-                minLength={4}
-                autoComplete="new-password"
-                className="input-premium"
-              />
-            </div>
-            <div>
-              <label className="block mb-2 font-semibold text-slate-400 text-sm">Confirmar Nueva Contraseña</label>
-              <input
-                type="password"
-                value={confirmarPassword}
-                onChange={(e) => setConfirmarPassword(e.target.value)}
-                placeholder="Repita la nueva contraseña"
-                required
-                minLength={4}
-                autoComplete="new-password"
-                className={`input-premium ${
-                  confirmarPassword && confirmarPassword !== nuevaPassword ? '!border-rose-500 !ring-rose-500/50' : ''
-                }`}
-              />
-              {confirmarPassword && confirmarPassword !== nuevaPassword && (
-                <p className="text-rose-400 text-sm mt-2 font-semibold anim-fade-in">
-                  Las contraseñas no coinciden
-                </p>
-              )}
-            </div>
-            <button type="submit" className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-blue-500/20 mt-2">
-              Guardar Nueva Contraseña
-            </button>
-          </form>
-        </div>
+            ) : (
+              <div className="text-center text-tinta-tenue">
+                <Coffee size={28} className="mx-auto mb-2" />
+                <div className="text-[0.6875rem] uppercase tracking-wide">Sin logo</div>
+              </div>
+            )}
+          </div>
 
-        {/* SECCIÓN: Logo de Login */}
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700 p-5 sm:p-8 shadow-xl shadow-black/20">
-          <h3 className="m-0 mb-2 text-slate-100 text-xl font-bold flex items-center gap-2">
-            <ImageIcon size={20} className="text-blue-500" /> Logo de Pantalla de Login
-          </h3>
-          <p className="text-slate-400 text-sm mb-6">
-            Sube una imagen JPG o PNG que se mostrará en la pantalla de inicio de sesión.
-          </p>
+          <div className="flex flex-col gap-2">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={subirLogoHandler}
+              className="hidden"
+            />
+            <Boton variante="secundario" onClick={() => logoInputRef.current?.click()}>
+              <Upload size={15} /> Subir imagen
+            </Boton>
 
-          <div className="flex gap-8 flex-wrap items-start">
-            {/* Preview */}
-            <div className="w-40 h-40 rounded-2xl border-2 border-dashed border-slate-600 flex items-center justify-center overflow-hidden bg-slate-900/50 shrink-0">
-              {logoPreview ? (
-                <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
-              ) : tieneLogo ? (
-                <img
-                  src={servicioAuth.obtenerLogoUrl() + '?t=' + Date.now()}
-                  alt="Logo actual"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="text-center text-slate-500">
-                  <div className="flex justify-center mb-2">
-                    <Coffee size={40} className="opacity-50" />
-                  </div>
-                  <div className="text-xs font-bold uppercase tracking-wider">Sin logo</div>
-                </div>
-              )}
-            </div>
+            {tieneLogo && (
+              <Boton variante="peligro" onClick={eliminarLogoHandler}>
+                <Trash2 size={15} /> Eliminar logo
+              </Boton>
+            )}
 
-            {/* Botones */}
-            <div className="flex flex-col gap-3">
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/jpeg,image/png"
-                onChange={subirLogoHandler}
-                className="hidden"
-              />
-              <button
-                onClick={() => logoInputRef.current?.click()}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-500/20"
-              >
-                <Upload size={18} /> Subir Imagen
-              </button>
-
-              {tieneLogo && (
-                <button
-                  onClick={eliminarLogoHandler}
-                  className="px-6 py-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  <Trash2 size={18} /> Eliminar Logo
-                </button>
-              )}
-
-              <p className="text-slate-500 text-xs m-0 max-w-[250px] leading-relaxed mt-2">
-                Formatos: JPG, PNG. Se mostrará en la pantalla de login.
-              </p>
-            </div>
+            <p className="mt-1 max-w-[220px] text-xs text-tinta-tenue">
+              Formatos JPG o PNG. Se muestra en la pantalla de ingreso.
+            </p>
           </div>
         </div>
-      </div>
+      </Tarjeta>
     </div>
   );
 }

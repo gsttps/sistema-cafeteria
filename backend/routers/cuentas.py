@@ -7,44 +7,51 @@ from uuid import UUID
 from decimal import Decimal
 
 from backend.base_datos import obtener_db, obtener_usuario_actual
+from backend.constantes import PRODUCTO_DEUDA_ANTERIOR, PRODUCTO_TRASPASO_DEUDA, PRODUCTOS_ARRASTRE
 from backend.modelos import CuentaMensual, Transaccion, Producto, Cliente, Usuario
 from backend.esquemas import TransaccionCrear, PedidoPersonalizadoCrear, CuentaMensualRespuesta, TransaccionRespuesta, PagoCuentaRequest
+from backend.zona_horaria import ahora_negocio, fecha_hora_negocio
 
 router = APIRouter(prefix="/cuentas", tags=["Cuentas Mensuales"])
 
 def resolver_periodo_y_fecha(mes: Optional[int], anio: Optional[int], dia: Optional[int]):
     """Devuelve (mes, anio, fecha_hora) para una transacción a partir de la
-    selección del usuario. Si falta mes/anio usa el actual. Construye fecha_hora
-    con timezone UTC al mediodía para evitar corrimientos de día por zona horaria."""
-    ahora = datetime.datetime.now(datetime.timezone.utc)
+    selección del usuario. Si falta mes/anio/día usa el actual en hora de Chile."""
+    ahora = ahora_negocio()
     mes = mes or ahora.month
     anio = anio or ahora.year
     ultimo_dia = calendar.monthrange(anio, mes)[1]
     # "solo mes" => día actual ajustado (clamp al último día válido del mes)
     dia_final = min(dia or ahora.day, ultimo_dia)
-    fecha_hora = ahora.replace(year=anio, month=mes, day=dia_final,
-                               hour=12, minute=0, second=0, microsecond=0)
+    fecha_hora = fecha_hora_negocio(anio, mes, dia_final)
     return mes, anio, fecha_hora
+
+def _fila_transaccion(t: Transaccion) -> dict:
+    """Serializa una transacción para la respuesta, marcando si es una línea de
+    arrastre de deuda (la interfaz la muestra como saldo, no como consumo)."""
+    nombre = t.producto.nombre if t.producto else "Producto Eliminado"
+    return {
+        "id": t.id,
+        "cuenta_mensual_id": t.cuenta_mensual_id,
+        "producto_id": t.producto_id,
+        "producto_nombre": nombre,
+        "cantidad": t.cantidad,
+        "precio_historico": t.precio_historico,
+        "fecha_hora": t.fecha_hora,
+        "es_arrastre": nombre in PRODUCTOS_ARRASTRE,
+    }
+
 
 def ayudante_calcular_cuenta(cuenta: CuentaMensual, db: Optional[Session] = None) -> dict:
     """Función de ayuda para calcular totales de la cuenta en tiempo real y enriquecer nombres de productos."""
     total_original = Decimal("0.00")
     transacciones_data = []
-    
+
     for t in cuenta.transacciones:
-        subtotal = Decimal(str(t.cantidad)) * t.precio_historico
-        total_original += subtotal
-        
-        transacciones_data.append({
-            "id": t.id,
-            "cuenta_mensual_id": t.cuenta_mensual_id,
-            "producto_id": t.producto_id,
-            "producto_nombre": t.producto.nombre if t.producto else "Producto Eliminado",
-            "cantidad": t.cantidad,
-            "precio_historico": t.precio_historico,
-            "fecha_hora": t.fecha_hora
-        })
-        
+        total_original += Decimal(str(t.cantidad)) * t.precio_historico
+        transacciones_data.append(_fila_transaccion(t))
+
+
     descuento = (cuenta.porcentaje_descuento / Decimal("100.00")) * total_original
     total_con_descuento = total_original - descuento
     
@@ -67,15 +74,7 @@ def ayudante_calcular_cuenta(cuenta: CuentaMensual, db: Optional[Session] = None
             tot_orig_cp = Decimal("0.00")
             for t in cp.transacciones:
                 tot_orig_cp += Decimal(str(t.cantidad)) * t.precio_historico
-                transacciones_pagadas.append({
-                    "id": t.id,
-                    "cuenta_mensual_id": t.cuenta_mensual_id,
-                    "producto_id": t.producto_id,
-                    "producto_nombre": t.producto.nombre if t.producto else "Producto Eliminado",
-                    "cantidad": t.cantidad,
-                    "precio_historico": t.precio_historico,
-                    "fecha_hora": t.fecha_hora
-                })
+                transacciones_pagadas.append(_fila_transaccion(t))
             desc_cp = (cp.porcentaje_descuento / Decimal("100.00")) * tot_orig_cp
             total_ya_pagado += (tot_orig_cp - desc_cp)
 
@@ -109,13 +108,13 @@ def leer_cuenta_actual(
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
         
-    # Obtener mes y año local actual si no vienen especificados
-    ahora = datetime.datetime.now()
+    # Obtener mes y año actual (hora de Chile) si no vienen especificados
+    ahora = ahora_negocio()
     if mes is None:
         mes = ahora.month
     if anio is None:
         anio = ahora.year
-    
+
     # Intentar buscar una cuenta abierta para el mes solicitado
     cuenta = db.query(CuentaMensual).options(
         selectinload(CuentaMensual.transacciones).joinedload(Transaccion.producto)
@@ -126,7 +125,10 @@ def leer_cuenta_actual(
         CuentaMensual.estado == "abierta"
     ).first()
 
-    # Si no hay cuenta abierta, crear una nueva (incluso si hay una pagada)
+    # Consultar no debe escribir: si no hay cuenta abierta devolvemos una cuenta
+    # "virtual" (id nulo, sin persistir) que se materializa recién con el primer
+    # consumo en agregar_item / pedido_personalizado. Así mirar la ficha de un
+    # cliente deja de generar cuentas vacías.
     if not cuenta:
         cuenta = CuentaMensual(
             cliente_id=cliente_id,
@@ -135,10 +137,7 @@ def leer_cuenta_actual(
             porcentaje_descuento=Decimal("0.00"),
             estado="abierta"
         )
-        db.add(cuenta)
-        db.commit()
-        db.refresh(cuenta)
-        
+
     return ayudante_calcular_cuenta(cuenta, db=db)
 
 @router.post("/cliente/{cliente_id}/agregar_item", response_model=TransaccionRespuesta)
@@ -291,6 +290,14 @@ def cerrar_cuenta(
     if cuenta.estado == "pagada":
         raise HTTPException(status_code=400, detail="La cuenta ya está pagada")
 
+    # El cierre lleva el descuento en el mismo request para que el total cobrado
+    # coincida siempre con el que se mostró en pantalla, sin depender de que el
+    # guardado aparte del descuento haya llegado. Si no viene, se respeta el
+    # que ya está persistido (por eso "is not None" y no un "or 0").
+    if pago.porcentaje_descuento is not None:
+        cuenta.porcentaje_descuento = pago.porcentaje_descuento
+        db.flush()
+
     datos_cuenta = ayudante_calcular_cuenta(cuenta, db=db)
     total_con_descuento = Decimal(str(datos_cuenta["total_con_descuento"]))
     
@@ -303,31 +310,37 @@ def cerrar_cuenta(
     
     if deuda > Decimal("0.00"):
         # Asegurar que existen los productos especiales
-        prod_deuda_anterior = db.query(Producto).filter(Producto.nombre == "Deuda anterior").first()
+        prod_deuda_anterior = db.query(Producto).filter(Producto.nombre == PRODUCTO_DEUDA_ANTERIOR).first()
         if not prod_deuda_anterior:
-            prod_deuda_anterior = Producto(nombre="Deuda anterior", precio_actual=0)
+            prod_deuda_anterior = Producto(nombre=PRODUCTO_DEUDA_ANTERIOR, precio_actual=0)
             db.add(prod_deuda_anterior)
-            
-        prod_traspaso = db.query(Producto).filter(Producto.nombre == "Traspaso de deuda").first()
+
+        prod_traspaso = db.query(Producto).filter(Producto.nombre == PRODUCTO_TRASPASO_DEUDA).first()
         if not prod_traspaso:
-            prod_traspaso = Producto(nombre="Traspaso de deuda", precio_actual=0)
+            prod_traspaso = Producto(nombre=PRODUCTO_TRASPASO_DEUDA, precio_actual=0)
             db.add(prod_traspaso)
             
         db.flush()
-        
-        # Insertar transacción negativa en el mes actual
+
+        # Cada línea de arrastre se fecha dentro del mes de SU cuenta, no en la
+        # fecha real del cierre: si en agosto se cierra la cuenta de mayo, la
+        # línea de mayo quedaría fechada en agosto y contradiría el mes al que
+        # pertenece (balances agrupa por fecha para las series diarias).
+        next_mes = cuenta.mes + 1 if cuenta.mes < 12 else 1
+        next_anio = cuenta.anio if cuenta.mes < 12 else cuenta.anio + 1
+        ultimo_dia = calendar.monthrange(cuenta.anio, cuenta.mes)[1]
+
+        # Insertar transacción negativa en el mes actual: cierra la columna, va al último día
         t_traspaso = Transaccion(
             cuenta_mensual_id=cuenta.id,
             producto_id=prod_traspaso.id,
             cantidad=1,
-            precio_historico=-deuda
+            precio_historico=-deuda,
+            fecha_hora=fecha_hora_negocio(cuenta.anio, cuenta.mes, ultimo_dia),
         )
         db.add(t_traspaso)
-        
+
         # Buscar o crear la cuenta del mes siguiente
-        next_mes = cuenta.mes + 1 if cuenta.mes < 12 else 1
-        next_anio = cuenta.anio if cuenta.mes < 12 else cuenta.anio + 1
-        
         cuenta_siguiente = db.query(CuentaMensual).filter(
             CuentaMensual.cliente_id == cuenta.cliente_id,
             CuentaMensual.mes == next_mes,
@@ -345,12 +358,13 @@ def cerrar_cuenta(
             db.add(cuenta_siguiente)
             db.flush()
             
-        # Insertar la deuda en el mes siguiente
+        # Insertar la deuda en el mes siguiente: abre la columna, va al día 1
         t_deuda = Transaccion(
             cuenta_mensual_id=cuenta_siguiente.id,
             producto_id=prod_deuda_anterior.id,
             cantidad=1,
-            precio_historico=deuda
+            precio_historico=deuda,
+            fecha_hora=fecha_hora_negocio(next_anio, next_mes, 1),
         )
         db.add(t_deuda)
         
